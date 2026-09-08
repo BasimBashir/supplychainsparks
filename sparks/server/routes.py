@@ -84,3 +84,17 @@ def fetch_now(request: Request):
 @router.get("/jobs/{job_id}")
 def job_status(request: Request, job_id: str):
     return request.app.state.job_runner.status(job_id)
+
+
+@router.post("/stories/{story_id}/generate")
+def generate(request: Request, story_id: int, body: dict = None):
+    from sparks.generate.service import GenerationService
+    db = _db(request)
+    if not db.get_story(story_id):
+        raise HTTPException(404, "story not found")
+    body = body or {}
+    service = GenerationService(_settings(request), db)
+    formats = tuple(body.get("formats", ["article", "linkedin"]))
+    job_id = request.app.state.job_runner.submit("generate", service.generate_for_story,
+                                                 story_id, formats)
+    return {"job_id": job_id}
