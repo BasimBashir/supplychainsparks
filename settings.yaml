@@ -1,10 +1,21 @@
 # Supply Chain Sparks defaults. Override by copying this file and setting
 # the SPARKS_SETTINGS env var to the copy's path.
+server:
+  host: "127.0.0.1"
+  port: 8765
+
 fetch:
   user_agent: "SupplyChainSparksBot/0.1 (+https://supplychainsparks.com)"
   per_domain_delay_seconds: 3
   timeout_seconds: 20
   max_items_per_source: 50
+  schedule_hours: 6        # automated fetch interval; 0 disables scheduling
+
+publish:
+  repo_url: ""             # https://github.com/<org>/<content-repo>.git
+  branch: "main"
+  token: "env:SPARKS_GIT_TOKEN"
+  site_base_url: "https://supplychainsparks.com"
 
 judge:
   default_tier: api            # api | local

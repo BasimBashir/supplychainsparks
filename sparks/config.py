@@ -18,6 +18,21 @@ class FetchConfig:
     per_domain_delay_seconds: float = 3.0
     timeout_seconds: int = 20
     max_items_per_source: int = 50
+    schedule_hours: float = 6.0
+
+
+@dataclass
+class ServerConfig:
+    host: str = "127.0.0.1"
+    port: int = 8765
+
+
+@dataclass
+class PublishConfig:
+    repo_url: str = ""
+    branch: str = "main"
+    token: str = ""
+    site_base_url: str = "https://supplychainsparks.com"
 
 
 @dataclass
@@ -70,6 +85,8 @@ class Settings:
     fetch: FetchConfig = field(default_factory=FetchConfig)
     judge: JudgeConfig = field(default_factory=JudgeConfig)
     rank: RankConfig = field(default_factory=RankConfig)
+    server: ServerConfig = field(default_factory=ServerConfig)
+    publish: PublishConfig = field(default_factory=PublishConfig)
 
     @property
     def db_path(self) -> pathlib.Path:
@@ -130,4 +147,8 @@ def load_settings(path: pathlib.Path | str | None = None) -> Settings:
         _merge(settings.judge, raw["judge"])
     if isinstance(raw.get("rank"), dict):
         _merge(settings.rank, raw["rank"])
+    if isinstance(raw.get("server"), dict):
+        _merge(settings.server, raw["server"])
+    if isinstance(raw.get("publish"), dict):
+        _merge(settings.publish, raw["publish"])
     return settings

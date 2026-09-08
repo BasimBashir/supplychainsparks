@@ -18,9 +18,19 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "respx>=0.21"]
+app = [
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.30",
+    "apscheduler>=3.10",
+    "pystray>=0.19",
+    "pillow>=10.0",
+    "pywebview>=5.0",
+    "dulwich>=0.22",
+]
 
 [project.scripts]
 sparks = "sparks.cli:main"
+sparks-app = "sparks.app.main:run"
 
 [tool.setuptools.packages.find]
 include = ["sparks*"]

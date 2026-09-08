@@ -35,3 +35,11 @@ def test_env_placeholder_resolves_api_key(tmp_path, monkeypatch):
 def test_missing_settings_file_raises(tmp_path):
     with pytest.raises(FileNotFoundError):
         load_settings(tmp_path / "nope.yaml")
+
+
+def test_server_and_publish_defaults(tmp_path, monkeypatch):
+    monkeypatch.setenv("SPARKS_HOME", str(tmp_path))
+    s = load_settings(repo_settings_path())
+    assert s.server.host == "127.0.0.1" and s.server.port == 8765
+    assert s.publish.branch == "main"
+    assert s.fetch.schedule_hours == 6

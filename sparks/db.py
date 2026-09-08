@@ -336,3 +336,14 @@ class Database:
             "UPDATE items SET story_id=NULL, extracted_text=NULL, language=NULL,"
             " word_count=NULL, status='new';")
         self.conn.commit()
+
+    # -- settings kv ----------------------------------------------------------
+    def get_setting(self, key: str) -> str | None:
+        row = self.conn.execute("SELECT value FROM settings_kv WHERE key=?", (key,)).fetchone()
+        return row["value"] if row else None
+
+    def set_setting(self, key: str, value: str) -> None:
+        self.conn.execute(
+            "INSERT INTO settings_kv (key, value) VALUES (?,?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, value))
+        self.conn.commit()
