@@ -35,6 +35,10 @@ def create_app(settings: Settings, db: Database | None = None,
     from sparks.server.routes import router
     app.include_router(router)
 
+    @app.get("/api/health")
+    def health():
+        return {"status": "ok"}
+
     app.state.settings = settings
     app.state.db = db
     if job_runner is None:

@@ -122,6 +122,25 @@ def _default_data_dir() -> pathlib.Path:
     return pathlib.Path.home() / ".local" / "share" / "supplychainsparks"
 
 
+def read_secrets(settings_path) -> dict:
+    """Secrets live in secrets.yaml next to the settings file (gitignored)."""
+    import yaml
+    path = pathlib.Path(settings_path).parent / "secrets.yaml"
+    if not path.exists():
+        return {}
+    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+
+
+def write_secrets(settings_path, values: dict) -> None:
+    import yaml
+    path = pathlib.Path(settings_path).parent / "secrets.yaml"
+    data: dict = {}
+    if path.exists():
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    data.update({k: v for k, v in values.items() if v is not None})
+    path.write_text(yaml.safe_dump(data), encoding="utf-8")
+
+
 def load_settings(path: pathlib.Path | str | None = None) -> Settings:
     if path is None:
         env_path = os.environ.get("SPARKS_SETTINGS")
@@ -151,4 +170,12 @@ def load_settings(path: pathlib.Path | str | None = None) -> Settings:
         _merge(settings.server, raw["server"])
     if isinstance(raw.get("publish"), dict):
         _merge(settings.publish, raw["publish"])
+
+    secrets = read_secrets(path)
+    if secrets.get("api_key"):
+        settings.judge.api.api_key = secrets["api_key"]
+    if secrets.get("repo_url"):
+        settings.publish.repo_url = secrets["repo_url"]
+    if secrets.get("git_token"):
+        settings.publish.token = secrets["git_token"]
     return settings

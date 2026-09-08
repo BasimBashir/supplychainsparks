@@ -196,3 +196,37 @@ def publish(request: Request, story_id: int, body: dict):
 @router.get("/publications")
 def publications(request: Request):
     return {"publications": _db(request).list_publications()}
+
+
+@router.get("/settings-status")
+def settings_status(request: Request):
+    import httpx
+    from sparks.config import read_secrets
+    settings = _settings(request)
+    secrets = read_secrets(settings.settings_path)
+    ollama = False
+    try:
+        ollama = httpx.get(f"{settings.judge.local.ollama_url}/api/version",
+                           timeout=1.5).status_code == 200
+    except Exception:
+        pass
+    return {"has_api_key": bool(secrets.get("api_key") or settings.judge.api.api_key),
+            "has_repo": bool(secrets.get("repo_url") or settings.publish.repo_url),
+            "ollama": ollama,
+            "schedule_hours": settings.fetch.schedule_hours}
+
+
+@router.post("/settings")
+def post_settings(request: Request, body: dict):
+    from sparks.config import write_secrets
+    settings = _settings(request)
+    secrets = {}
+    if "api_key" in body:
+        secrets["api_key"] = body["api_key"]
+    if "repo_url" in body:
+        secrets["repo_url"] = body["repo_url"]
+    if "git_token" in body:
+        secrets["git_token"] = body["git_token"]
+    if secrets:
+        write_secrets(settings.settings_path, secrets)
+    return {"status": "saved"}
