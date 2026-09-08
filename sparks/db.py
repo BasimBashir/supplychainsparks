@@ -10,7 +10,7 @@ from sparks.models import (
     FetchedEntry, ItemRecord, JudgeScoreRow, Source, SourceRun, StoryRecord,
 )
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS sources (
@@ -81,6 +81,39 @@ CREATE TABLE IF NOT EXISTS fetch_runs (
 CREATE TABLE IF NOT EXISTS settings_kv (
     key TEXT PRIMARY KEY,
     value TEXT
+);
+CREATE TABLE IF NOT EXISTS generations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    story_id INTEGER NOT NULL REFERENCES stories(id),
+    format TEXT NOT NULL CHECK (format IN ('article', 'linkedin')),
+    language TEXT NOT NULL CHECK (language IN ('en', 'ar')),
+    model TEXT NOT NULL,
+    prompt_version TEXT NOT NULL,
+    content TEXT NOT NULL,
+    seo_slug TEXT, seo_description TEXT, seo_tags TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS fact_flags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    generation_id INTEGER NOT NULL REFERENCES generations(id),
+    claim TEXT NOT NULL,
+    verdict TEXT NOT NULL,
+    source_snippet TEXT,
+    status TEXT NOT NULL DEFAULT 'open',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS publications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    story_id INTEGER NOT NULL REFERENCES stories(id),
+    destination TEXT NOT NULL CHECK (destination IN ('site', 'linkedin')),
+    url TEXT, commit_sha TEXT, detail TEXT,
+    published_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 """
 
@@ -347,3 +380,73 @@ class Database:
             "INSERT INTO settings_kv (key, value) VALUES (?,?) "
             "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, value))
         self.conn.commit()
+
+    # -- generations / flags / publications -------------------------------
+    def save_generation(self, story_id: int, format: str, language: str, model: str,
+                        prompt_version: str, content: str, seo_slug: str | None = None,
+                        seo_description: str | None = None,
+                        seo_tags: str | None = None) -> int:
+        cur = self.conn.execute(
+            """INSERT INTO generations (story_id, format, language, model,
+               prompt_version, content, seo_slug, seo_description, seo_tags)
+               VALUES (?,?,?,?,?,?,?,?,?)""",
+            (story_id, format, language, model, prompt_version, content,
+             seo_slug, seo_description, seo_tags))
+        self.conn.commit()
+        return cur.lastrowid
+
+    def generations_for(self, story_id: int) -> list[dict]:
+        rows = self.conn.execute(
+            "SELECT * FROM generations WHERE story_id=? ORDER BY id", (story_id,)).fetchall()
+        return [dict(r) for r in rows]
+
+    def update_generation_content(self, gen_id: int, content: str) -> None:
+        self.conn.execute("UPDATE generations SET content=? WHERE id=?", (content, gen_id))
+        self.conn.commit()
+
+    def replace_fact_flags(self, gen_id: int, flags: list[dict]) -> None:
+        self.conn.execute("DELETE FROM fact_flags WHERE generation_id=?", (gen_id,))
+        for f in flags:
+            self.conn.execute(
+                "INSERT INTO fact_flags (generation_id, claim, verdict, source_snippet)"
+                " VALUES (?,?,?,?)",
+                (gen_id, f["claim"], f["verdict"], f.get("source_snippet", "")))
+        self.conn.commit()
+
+    def open_flags(self, story_id: int) -> list[dict]:
+        rows = self.conn.execute(
+            """SELECT ff.* FROM fact_flags ff JOIN generations g ON g.id = ff.generation_id
+               WHERE g.story_id=? AND ff.status='open' ORDER BY ff.id""",
+            (story_id,)).fetchall()
+        return [dict(r) for r in rows]
+
+    def resolve_flag(self, flag_id: int, resolution: str) -> None:
+        self.conn.execute("UPDATE fact_flags SET status=? WHERE id=?", (resolution, flag_id))
+        self.conn.commit()
+
+    def create_publication(self, story_id: int, destination: str, url: str | None,
+                           commit_sha: str | None, detail: str | None = None) -> int:
+        cur = self.conn.execute(
+            "INSERT INTO publications (story_id, destination, url, commit_sha, detail)"
+            " VALUES (?,?,?,?,?)", (story_id, destination, url, commit_sha, detail))
+        self.conn.commit()
+        return cur.lastrowid
+
+    def list_publications(self) -> list[dict]:
+        rows = self.conn.execute(
+            """SELECT p.*, s.title FROM publications p
+               JOIN stories s ON s.id = p.story_id ORDER BY p.id DESC""").fetchall()
+        return [dict(r) for r in rows]
+
+    def set_story_status(self, story_id: int, status: str) -> None:
+        self.conn.execute("UPDATE stories SET status=?, updated_at=? WHERE id=?",
+                          (status, datetime.now(timezone.utc).isoformat(), story_id))
+        self.conn.commit()
+
+    def get_story(self, story_id: int) -> StoryRecord | None:
+        r = self.conn.execute("SELECT * FROM stories WHERE id=?", (story_id,)).fetchone()
+        return self._row_to_story(r) if r else None
+
+    def all_source_names(self) -> list[str]:
+        return [r["name"] for r in
+                self.conn.execute("SELECT name FROM sources ORDER BY name").fetchall()]
