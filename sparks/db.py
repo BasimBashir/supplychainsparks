@@ -215,6 +215,12 @@ class Database:
         self.conn.execute("UPDATE items SET status=? WHERE id=?", (status, item_id))
         self.conn.commit()
 
+    def unextracted_items(self) -> list[ItemRecord]:
+        rows = self.conn.execute(
+            "SELECT * FROM items WHERE extracted_text IS NULL AND status != 'failed'"
+            " ORDER BY id").fetchall()
+        return [self._row_to_item(r) for r in rows]
+
     # -- stories -----------------------------------------------------------
     def create_story(self, title: str, primary_item_id: int) -> int:
         cur = self.conn.execute("INSERT INTO stories (title, primary_item_id) VALUES (?,?)",
@@ -277,6 +283,10 @@ class Database:
             " updated_at=? WHERE id=?",
             (priority, band, category, datetime.now(timezone.utc).isoformat(), story_id))
         self.conn.commit()
+
+    def all_stories(self) -> list[StoryRecord]:
+        rows = self.conn.execute("SELECT * FROM stories ORDER BY id").fetchall()
+        return [self._row_to_story(r) for r in rows]
 
     # -- judge scores --------------------------------------------------------
     def save_judge_score(self, story_id: int, tier: str, model: str, prompt_version: str,

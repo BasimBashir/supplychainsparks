@@ -14,7 +14,7 @@ from sparks.config import Settings
 from sparks.db import Database
 from sparks.fetch.html import parse_listing
 from sparks.fetch.rss import parse_feed
-from sparks.models import FetchedEntry, Source, SourceRun
+from sparks.models import FetchedEntry, ItemRecord, Source, SourceRun
 
 
 def delay_needed(now: float, last_request: float, delay_s: float) -> float:
@@ -128,3 +128,51 @@ class FetchRunner:
                 self.db.set_source_fetched(source.id or -1)
             runs.append(run)
         return runs
+
+
+class ContentFetcher:
+    """Second-stage fetch: per-item article pages -> raw + extracted text."""
+
+    def __init__(self, settings: Settings, db: Database, client: httpx.Client | None = None):
+        self.settings = settings
+        self.db = db
+        self._client = client
+        self._politeness: _Politeness | None = None
+
+    @property
+    def client(self) -> httpx.Client:
+        if self._client is None:
+            self._client = httpx.Client(
+                headers={"User-Agent": self.settings.fetch.user_agent,
+                         "Accept-Language": "en, ar;q=0.8"},
+                timeout=self.settings.fetch.timeout_seconds, follow_redirects=True)
+        return self._client
+
+    def fetch_article(self, item: ItemRecord) -> bool:
+        if self._politeness is None:
+            self._politeness = _Politeness(self.client.get, self.settings.fetch.user_agent,
+                                           self.settings.fetch.per_domain_delay_seconds)
+        politeness = self._politeness
+        if not politeness.robots_allows(item.url):
+            self.db.update_item_status(item.id, "failed")
+            return False
+        try:
+            politeness.wait(item.url)
+            response = self.client.get(item.url)
+            response.raise_for_status()
+            raw_path = save_raw(self.settings.raw_dir, item.url, response.content)
+            from sparks.extract import extract_article
+            extracted = extract_article(response.content.decode("utf-8", errors="replace"))
+            if extracted is None:
+                self.db.update_item_status(item.id, "failed")
+                return False
+            self.db.conn.execute(
+                "UPDATE items SET raw_path=?, extracted_text=?, language=?, word_count=?,"
+                " status='extracted' WHERE id=?",
+                (str(raw_path), extracted.text, extracted.language, extracted.word_count,
+                 item.id))
+            self.db.conn.commit()
+            return True
+        except Exception:
+            self.db.update_item_status(item.id, "failed")
+            return False
