@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel>
+  <title>Example Logistics News</title>
+  <link>https://example.com</link>
+  <item>
+    <title>Saudi Ports Authority announces new container terminal at Jeddah</title>
+    <link>https://example.com/jeddah-terminal?utm_source=rss</link>
+    <pubDate>Tue, 08 Sep 2026 06:30:00 GMT</pubDate>
+  </item>
+  <item>
+    <title>Dammam warehouse district sees record occupancy</title>
+    <link>https://example.com/dammam-warehouses</link>
+    <pubDate>Mon, 07 Sep 2026 18:00:00 GMT</pubDate>
+  </item>
+  <item>
+    <title>No date on this item</title>
+    <link>https://example.com/no-date</link>
+  </item>
+</channel></rss>
