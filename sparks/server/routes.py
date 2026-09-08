@@ -1,6 +1,9 @@
 """API routes for the dashboard."""
 from __future__ import annotations
 
+import json
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, HTTPException, Request
 
 from sparks.pipeline import run_cycle
@@ -129,3 +132,67 @@ def approve(request: Request, story_id: int):
         raise HTTPException(409, "open flags")
     db.set_story_status(story_id, "approved")
     return {"status": "approved"}
+
+
+def _first_line(text: str) -> str:
+    return text.strip().split("\n", 1)[0]
+
+
+@router.post("/generations/{generation_id}")
+def edit_generation(request: Request, generation_id: int, body: dict):
+    content = body.get("content")
+    if content is None:
+        raise HTTPException(400, "content required")
+    _db(request).update_generation_content(generation_id, content)
+    return {"status": "updated"}
+
+
+@router.post("/stories/{story_id}/publish")
+def publish(request: Request, story_id: int, body: dict):
+    from sparks.publish.content import build_post_files, slugify
+    from sparks.publish.git import GitPublisher
+    db = _db(request)
+    settings = _settings(request)
+    story = db.get_story(story_id)
+    if not story:
+        raise HTTPException(404, "story not found")
+    if story.status != "approved":
+        raise HTTPException(409, f"story is {story.status}, must be approved")
+    gens = {(g["format"], g["language"]): g for g in db.generations_for(story_id)}
+    result: dict = {"destinations": {}}
+    destinations = body.get("destinations", ["site"])
+    if "site" in destinations:
+        en = gens.get(("article", "en"))
+        ar = gens.get(("article", "ar"))
+        if not en:
+            raise HTTPException(409, "no english article to publish")
+        slug = en["seo_slug"] or slugify(story.title)
+        meta = {"slug": slug,
+                "title": story.title,
+                "titleAr": _first_line(ar["content"]) if ar else "",
+                "description": en["seo_description"] or "",
+                "descriptionAr": (ar["seo_description"] or "") if ar else "",
+                "category": story.category or "other",
+                "tags": json.loads(en["seo_tags"] or "[]"),
+                "publishedAt": datetime.now(timezone.utc).isoformat(),
+                "priority": story.priority}
+        publisher = GitPublisher(settings)
+        sha = publisher.publish(build_post_files(meta, en["content"],
+                                                 ar["content"] if ar else None),
+                                f"publish: {slug}")
+        url = publisher.build_url(slug)
+        db.create_publication(story_id, "site", url=url, commit_sha=sha, detail="en+ar")
+        db.set_story_status(story_id, "published")
+        result["destinations"]["site"] = {"url": url, "commit_sha": sha}
+        result["url"] = url
+        result["commit_sha"] = sha
+    if "linkedin" in destinations:
+        db.create_publication(story_id, "linkedin", url=None, commit_sha=None,
+                              detail="copied")
+        result["destinations"]["linkedin"] = {"status": "copied"}
+    return result
+
+
+@router.get("/publications")
+def publications(request: Request):
+    return {"publications": _db(request).list_publications()}
