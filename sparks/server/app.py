@@ -32,12 +32,15 @@ def create_app(settings: Settings, db: Database | None = None,
                 return JSONResponse({"detail": "unauthorized"}, status_code=401)
         return await call_next(request)
 
-    @app.get("/api/health")
-    def health():
-        return {"status": "ok"}
+    from sparks.server.routes import router
+    app.include_router(router)
 
     app.state.settings = settings
     app.state.db = db
+    if job_runner is None:
+        from sparks.server.jobs import JobRunner
+        job_runner = JobRunner()
+    app.state.job_runner = job_runner
 
     dashboard_dist = settings.settings_path.parent / "dashboard" / "dist"
     if dashboard_dist.exists():

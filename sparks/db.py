@@ -133,7 +133,7 @@ class Database:
     def __init__(self, path: pathlib.Path | str):
         self.path = pathlib.Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(self.path)
+        self.conn = sqlite3.connect(self.path, check_same_thread=False, timeout=30.0)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
         self.conn.execute("PRAGMA journal_mode=WAL")
