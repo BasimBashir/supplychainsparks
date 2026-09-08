@@ -1,0 +1,31 @@
+# Supply Chain Sparks defaults. Override by copying this file and setting
+# the SPARKS_SETTINGS env var to the copy's path.
+fetch:
+  user_agent: "SupplyChainSparksBot/0.1 (+https://supplychainsparks.com)"
+  per_domain_delay_seconds: 3
+  timeout_seconds: 20
+  max_items_per_source: 50
+
+judge:
+  default_tier: api            # api | local
+  api:
+    base_url: "https://open.bigmodel.cn/api/paas/v4"   # any OpenAI-compatible endpoint
+    model: "glm-4-flash"
+    api_key: "env:SPARKS_API_KEY"                       # env:VARNAME resolves at load
+  local:
+    enabled: true
+    ollama_url: "http://localhost:11434"
+    model: "qwen2.5:3b"
+
+rank:
+  weights: {sc: 0.35, saudi: 0.30, impact: 0.25, novelty: 0.10}
+  rubric_scale: 7.0
+  corroboration_points: 4.0
+  corroboration_cap: 3          # max extra sources that earn points
+  credibility_points: 6.0
+  recency_points: 12.0
+  recency_halflife_hours: 24.0
+  high_band: 75.0
+  medium_band: 50.0
+
+prompts_dir: null               # optional absolute dir overriding bundled prompts

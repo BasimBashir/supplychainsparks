@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "supplychainsparks"
+version = "0.1.0"
+description = "Supply Chain Sparks - supply chain intelligence pipeline for Saudi Arabia / GCC"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27",
+    "feedparser>=6.0.11",
+    "trafilatura>=1.12",
+    "rapidfuzz>=3.6",
+    "pydantic>=2.7",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "respx>=0.21"]
+
+[project.scripts]
+sparks = "sparks.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["sparks*"]
+
+[tool.setuptools.package-data]
+sparks = ["prompts/*.md"]
