@@ -7,3 +7,5 @@ dist/
 build/
 *.spec
 .pytest_cache/
+node_modules/
+dashboard/dist/
