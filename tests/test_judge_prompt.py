@@ -15,7 +15,7 @@ def test_prompt_contains_context_and_schema():
 
 
 def test_prompt_anchor_examples_present():
-    messages = render_judge_prompt(StoryContext("t", "l", "b", 1))
+    messages = render_judge_prompt(StoryContext(title="t", lead="l", body="b", n_sources=1))
     assert "ANCHOR" in messages[0]["content"]
 
 
@@ -26,5 +26,5 @@ def test_prompt_override_dir_used(settings, tmp_path):
     settings.prompts_dir = tmp_path / "prompts"
     from sparks.judge import prompt as prompt_mod
     messages = prompt_mod.render_judge_prompt(
-        StoryContext("t", "l", "b", 1), settings=settings)
+        StoryContext(title="t", lead="l", body="b", n_sources=1), settings=settings)
     assert messages[0]["content"] == "OVERRIDE SYSTEM supply_chain_relevance, saudi_gcc_relevance, market_impact, novelty, rationale_supply_chain, rationale_saudi_gcc, rationale_market_impact, rationale_novelty, suggested_category, gist"
