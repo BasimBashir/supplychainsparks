@@ -98,3 +98,34 @@ def generate(request: Request, story_id: int, body: dict = None):
     job_id = request.app.state.job_runner.submit("generate", service.generate_for_story,
                                                  story_id, formats)
     return {"job_id": job_id}
+
+
+@router.post("/generations/{generation_id}/fact-check")
+def fact_check(request: Request, generation_id: int):
+    from sparks.factcheck.service import FactCheckService
+    service = FactCheckService(_settings(request), _db(request))
+    job_id = request.app.state.job_runner.submit("factcheck", service.check_generation,
+                                                 generation_id)
+    return {"job_id": job_id}
+
+
+@router.post("/flags/{flag_id}/resolve")
+def resolve_flag(request: Request, flag_id: int, body: dict):
+    resolution = body.get("resolution")
+    if resolution not in ("resolved_edit", "resolved_confirm"):
+        raise HTTPException(400, "resolution must be resolved_edit|resolved_confirm")
+    _db(request).resolve_flag(flag_id, resolution)
+    return {"status": resolution}
+
+
+@router.post("/stories/{story_id}/approve")
+def approve(request: Request, story_id: int):
+    db = _db(request)
+    if not db.get_story(story_id):
+        raise HTTPException(404, "story not found")
+    if not db.generations_for(story_id):
+        raise HTTPException(409, "no generations")
+    if db.open_flags(story_id):
+        raise HTTPException(409, "open flags")
+    db.set_story_status(story_id, "approved")
+    return {"status": "approved"}
