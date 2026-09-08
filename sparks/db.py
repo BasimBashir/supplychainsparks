@@ -407,10 +407,11 @@ class Database:
     def replace_fact_flags(self, gen_id: int, flags: list[dict]) -> None:
         self.conn.execute("DELETE FROM fact_flags WHERE generation_id=?", (gen_id,))
         for f in flags:
+            status = "ok" if f.get("verdict") == "supported" else "open"
             self.conn.execute(
-                "INSERT INTO fact_flags (generation_id, claim, verdict, source_snippet)"
-                " VALUES (?,?,?,?)",
-                (gen_id, f["claim"], f["verdict"], f.get("source_snippet", "")))
+                "INSERT INTO fact_flags (generation_id, claim, verdict, source_snippet,"
+                " status) VALUES (?,?,?,?,?)",
+                (gen_id, f["claim"], f["verdict"], f.get("source_snippet", ""), status))
         self.conn.commit()
 
     def open_flags(self, story_id: int) -> list[dict]:
