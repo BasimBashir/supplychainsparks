@@ -38,3 +38,23 @@ def test_post_settings_persists_secrets(env):
     secrets_file = settings.settings_path.parent / "secrets.yaml"
     text = secrets_file.read_text(encoding="utf-8")
     assert "sk-new" in text and "github.com/o/r" in text
+
+
+def test_post_settings_persists_tier_and_models(env):
+    tc, h, settings = env
+    r = tc.post("/api/settings", headers=h,
+                json={"default_tier": "local", "api_model": "glm-4-plus",
+                      "local_model": "qwen2.5:7b"})
+    assert r.status_code == 200
+    from sparks.config import load_settings
+    reloaded = load_settings(settings.settings_path)
+    assert reloaded.judge.default_tier == "local"
+    assert reloaded.judge.api.model == "glm-4-plus"
+    assert reloaded.judge.local.model == "qwen2.5:7b"
+
+
+def test_settings_status_reports_tier_and_models(env):
+    tc, h, settings = env
+    data = tc.get("/api/settings-status", headers=h).json()
+    assert data["default_tier"] == "local"  # conftest fixture sets local
+    assert data["api_model"] and data["local_model"]

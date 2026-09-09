@@ -213,20 +213,43 @@ def settings_status(request: Request):
     return {"has_api_key": bool(secrets.get("api_key") or settings.judge.api.api_key),
             "has_repo": bool(secrets.get("repo_url") or settings.publish.repo_url),
             "ollama": ollama,
-            "schedule_hours": settings.fetch.schedule_hours}
+            "schedule_hours": settings.fetch.schedule_hours,
+            "default_tier": settings.judge.default_tier,
+            "api_model": settings.judge.api.model,
+            "local_model": settings.judge.local.model}
 
 
 @router.post("/settings")
 def post_settings(request: Request, body: dict):
     from sparks.config import write_secrets
     settings = _settings(request)
-    secrets = {}
-    if "api_key" in body:
-        secrets["api_key"] = body["api_key"]
-    if "repo_url" in body:
-        secrets["repo_url"] = body["repo_url"]
-    if "git_token" in body:
-        secrets["git_token"] = body["git_token"]
+    allowed = ("api_key", "repo_url", "git_token", "default_tier", "api_model",
+               "local_model", "schedule_hours")
+    secrets = {k: body[k] for k in allowed if k in body and body[k] is not None}
+    if secrets.get("default_tier") not in (None, "api", "local"):
+        raise HTTPException(400, "default_tier must be api|local")
     if secrets:
         write_secrets(settings.settings_path, secrets)
+        # apply immediately to the running app's settings object
+        _apply_settings(settings, secrets)
     return {"status": "saved"}
+
+
+def _apply_settings(settings, values: dict) -> None:
+    if "api_key" in values:
+        settings.judge.api.api_key = values["api_key"]
+    if "repo_url" in values:
+        settings.publish.repo_url = values["repo_url"]
+    if "git_token" in values:
+        settings.publish.token = values["git_token"]
+    if values.get("default_tier") in ("api", "local"):
+        settings.judge.default_tier = values["default_tier"]
+    if values.get("api_model"):
+        settings.judge.api.model = values["api_model"]
+    if values.get("local_model"):
+        settings.judge.local.model = values["local_model"]
+    if values.get("schedule_hours") is not None:
+        try:
+            settings.fetch.schedule_hours = float(values["schedule_hours"])
+        except (TypeError, ValueError):
+            pass

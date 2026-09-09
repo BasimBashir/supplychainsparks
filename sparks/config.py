@@ -178,4 +178,15 @@ def load_settings(path: pathlib.Path | str | None = None) -> Settings:
         settings.publish.repo_url = secrets["repo_url"]
     if secrets.get("git_token"):
         settings.publish.token = secrets["git_token"]
+    if secrets.get("default_tier") in ("api", "local"):
+        settings.judge.default_tier = secrets["default_tier"]
+    if secrets.get("api_model"):
+        settings.judge.api.model = secrets["api_model"]
+    if secrets.get("local_model"):
+        settings.judge.local.model = secrets["local_model"]
+    if secrets.get("schedule_hours") is not None:
+        try:
+            settings.fetch.schedule_hours = float(secrets["schedule_hours"])
+        except (TypeError, ValueError):
+            pass
     return settings
