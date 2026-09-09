@@ -50,6 +50,17 @@ export default function SourcesView() {
     } catch (e) { setNote({ kind: "error", text: String(e) }); }
   }
 
+  async function remove(s) {
+    if (!window.confirm(`Delete source “${s.name}”?\n\nIts articles and stories ` +
+                        `built only from it are removed too. This cannot be undone.`))
+      return;
+    try {
+      await apiPost(`/api/sources/${s.id}/delete`);
+      setNote({ kind: "ok", text: `Deleted “${s.name}”` });
+      refresh();
+    } catch (e) { setNote({ kind: "error", text: String(e) }); }
+  }
+
   return (
     <div className="sources">
       <form className="source-form card" onSubmit={addSource}>
@@ -127,10 +138,13 @@ export default function SourcesView() {
               ? `🔍 topic — ${s.url}` : s.url}</p>
             <span className="cred">credibility {Number(s.credibility).toFixed(1)}</span>
           </div>
-          <button className={`btn subtle small ${s.enabled ? "" : "accent"}`}
-                  onClick={() => toggle(s)}>
-            {s.enabled ? "Disable" : "Enable"}
-          </button>
+          <div className="source-actions">
+            <button className={`btn subtle small ${s.enabled ? "" : "accent"}`}
+                    onClick={() => toggle(s)}>
+              {s.enabled ? "Disable" : "Enable"}
+            </button>
+            <button className="btn danger small" onClick={() => remove(s)}>Delete</button>
+          </div>
         </div>
       ))}
     </div>

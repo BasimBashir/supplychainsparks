@@ -108,7 +108,12 @@ def _open_window(url: str):
 
         def hide_to_tray():
             _WINDOW.hide()
-            return True  # cancel the close; keep running in the tray
+            # pywebview cancels the close only when the handler returns False
+            # (verified against 6.2.1 winforms: True lets the window close).
+            # Returning True here is what left a zombie process behind: the
+            # window vanished, the app kept running with no tray icon, and
+            # interpreter-exit waited for a mid-flight fetch/judge cycle.
+            return False
         _WINDOW.events.closing += hide_to_tray
     else:
         _WINDOW.show()
@@ -184,6 +189,11 @@ def _run_app(settings) -> None:
     import webview
     webview.start()   # blocks for the app's lifetime: the X button only hides
                        # the window; the process exits via tray Quit (os._exit)
+    # Reaching here means the window closed for real (OS shutdown / a close
+    # the closing-handler could not cancel). Exit immediately instead of
+    # falling into interpreter shutdown, which would join the JobRunner
+    # threads and hang on a mid-flight fetch/judge cycle for minutes.
+    _quit(server, tray, settings.data_dir)
 
 
 if __name__ == "__main__":

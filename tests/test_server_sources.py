@@ -67,6 +67,30 @@ def test_toggle_source_enable_disable(settings):
     assert [s for s in db.all_sources(enabled_only=True) if s.id == sid]
 
 
+def _source_with_item(db, name="Feed", url="https://x.com/rss", item_url="https://x.com/a"):
+    from datetime import datetime, timezone
+    from sparks.models import FetchedEntry, Source
+    sid = db.upsert_source(Source(name=name, kind="rss", url=url))
+    now = datetime(2026, 9, 9, tzinfo=timezone.utc)
+    iid = db.insert_item(sid, FetchedEntry(item_url, "story", now), "raw/x.html", now)
+    return sid, iid
+
+
+def test_delete_source_removes_items_and_emptied_stories(settings):
+    tc, h, db = env(settings)
+    sid, iid = _source_with_item(db)
+    story_id = db.create_story(title="story", primary_item_id=iid)
+
+    r = tc.post(f"/api/sources/{sid}/delete", headers=h)
+    assert r.status_code == 200 and r.json()["status"] == "deleted"
+    assert db.get_source(sid) is None
+    assert db.get_story(story_id) is None        # emptied story purged
+    assert db.conn.execute("SELECT COUNT(*) FROM items").fetchone()[0] == 0
+
+    missing = tc.post(f"/api/sources/{sid}/delete", headers=h)
+    assert missing.status_code == 404
+
+
 def test_add_search_source_with_topic(settings):
     tc, h, db = env(settings)
     r = tc.post("/api/sources", headers=h, json={

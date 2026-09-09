@@ -69,6 +69,19 @@ def select_story(request: Request, story_id: int):
     return {"status": "selected"}
 
 
+@router.post("/stories/{story_id}/delete")
+def delete_story(request: Request, story_id: int):
+    db = _db(request)
+    story = db.get_story(story_id)
+    if not story:
+        raise HTTPException(404, "story not found")
+    if story.status == "published":
+        raise HTTPException(409, "published stories cannot be deleted — "
+                                  "the article is live on the website")
+    db.delete_story(story_id)
+    return {"status": "deleted"}
+
+
 @router.get("/sources")
 def sources(request: Request):
     return {"sources": [{"id": s.id, "name": s.name, "kind": s.kind, "url": s.url,
@@ -117,6 +130,18 @@ def toggle_source(request: Request, source_id: int, body: dict):
         raise HTTPException(404, "source not found")
     db.set_source_enabled(source_id, bool(enabled))
     return {"status": "enabled" if enabled else "disabled"}
+
+
+@router.post("/sources/{source_id}/delete")
+def delete_source(request: Request, source_id: int):
+    """Delete a source plus its items; stories left empty are purged so
+    half-deleted ghosts don't linger in the queue."""
+    db = _db(request)
+    if not db.get_source(source_id):
+        raise HTTPException(404, "source not found")
+    db.delete_source(source_id)
+    purged = db.purge_orphan_stories()
+    return {"status": "deleted", "stories_purged": purged}
 
 
 @router.post("/fetch-now")

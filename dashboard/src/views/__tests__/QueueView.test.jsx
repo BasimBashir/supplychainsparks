@@ -2,7 +2,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi, test, expect, afterEach } from "vitest";
 import QueueView from "../QueueView.jsx";
-import { apiGet } from "../../api.js";
+import { apiGet, apiPost } from "../../api.js";
 
 vi.mock("../../api.js", () => ({
   apiGet: vi.fn(async () => ({
@@ -12,6 +12,7 @@ vi.mock("../../api.js", () => ({
       judge: { gist: "Big capex.", rationale: "Largest this year.",
                scores: { sc: 9, saudi: 10, impact: 8, novelty: 7 } },
     }],
+    unscored_count: 0,
   })),
   apiPost: vi.fn(async () => ({ status: "selected" })),
 }));
@@ -25,6 +26,14 @@ test("renders ranked story with rationale and selects it", async () => {
   expect(screen.getByText("3 sources")).toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: /select/i }));
   expect(onSelect).toHaveBeenCalledWith(7);
+});
+
+test("deletes a story after confirming and refreshes", async () => {
+  window.confirm = vi.fn(() => true);
+  render(<QueueView onSelect={() => {}} />);
+  expect(await screen.findByText("Jeddah expansion")).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: /delete/i }));
+  expect(apiPost).toHaveBeenCalledWith("/api/stories/7/delete");
 });
 
 test("surfaces unscored stories when no judge is available", async () => {

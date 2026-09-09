@@ -31,6 +31,16 @@ export default function StoryDetail({ storyId, onBack }) {
     }, 1500);
   }
 
+  async function remove() {
+    if (!window.confirm(`Delete “${story.title}”?\n\nThis removes the story and its ` +
+                        `clipped articles from this PC. It cannot be undone.`))
+      return;
+    try {
+      await apiPost(`/api/stories/${storyId}/delete`);
+      onBack();
+    } catch (e) { setMsg(String(e)); }
+  }
+
   return (
     <div className="detail">
       <div className="back-row">
@@ -75,6 +85,9 @@ export default function StoryDetail({ storyId, onBack }) {
           <button className="btn small" onClick={() => generate(["linkedin"])}>
             Generate LinkedIn (EN + AR)
           </button>
+          {story.status !== "published" && (
+            <button className="btn danger small" onClick={remove}>Delete story</button>
+          )}
         </div>
         {msg && <p className="gist" style={{ marginTop: 10 }}>{msg}</p>}
       </div>

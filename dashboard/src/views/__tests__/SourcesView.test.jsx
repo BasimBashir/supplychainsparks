@@ -84,3 +84,25 @@ test("adds a web-search source by topic", async () => {
                                topic: "Red Sea shipping attacks", url: null }));
   expect(await screen.findByText(/added/i)).toBeInTheDocument();
 });
+
+test("deletes a source after confirming", async () => {
+  window.confirm = vi.fn(() => true);
+  const user = userEvent.setup();
+  render(<SourcesView />);
+  expect(await screen.findByText("Google News - Saudi ports")).toBeInTheDocument();
+
+  await user.click(screen.getAllByRole("button", { name: /delete/i })[0]);
+  expect(window.confirm).toHaveBeenCalled();
+  expect(apiPost).toHaveBeenCalledWith("/api/sources/1/delete");
+  expect(await screen.findByText(/deleted/i)).toBeInTheDocument();
+});
+
+test("cancel keeps the source", async () => {
+  window.confirm = vi.fn(() => false);
+  const user = userEvent.setup();
+  render(<SourcesView />);
+  expect(await screen.findByText("Google News - Saudi ports")).toBeInTheDocument();
+
+  await user.click(screen.getAllByRole("button", { name: /delete/i })[0]);
+  expect(apiPost).not.toHaveBeenCalledWith("/api/sources/1/delete");
+});

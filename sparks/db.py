@@ -319,13 +319,36 @@ class Database:
                WHERE NOT EXISTS (SELECT 1 FROM items i WHERE i.story_id = s.id)
                  AND s.status != 'published'""").fetchall()]
         for story_id in orphans:
-            self.conn.execute("DELETE FROM publications WHERE story_id=?", (story_id,))
-            self.conn.execute("DELETE FROM generations WHERE story_id=?", (story_id,))
-            self.conn.execute("DELETE FROM judge_scores WHERE story_id=?", (story_id,))
-            self.conn.execute("DELETE FROM stories WHERE id=?", (story_id,))
+            self._delete_story_rows(story_id)
         if orphans:
             self.conn.commit()
         return len(orphans)
+
+    def _delete_story_rows(self, story_id: int) -> None:
+        """Delete one story and everything hanging off it (no file cleanup)."""
+        self.conn.execute(
+            "DELETE FROM fact_flags WHERE generation_id IN "
+            "(SELECT id FROM generations WHERE story_id=?)", (story_id,))
+        self.conn.execute("DELETE FROM publications WHERE story_id=?", (story_id,))
+        self.conn.execute("DELETE FROM generations WHERE story_id=?", (story_id,))
+        self.conn.execute("DELETE FROM judge_scores WHERE story_id=?", (story_id,))
+        self.conn.execute("DELETE FROM stories WHERE id=?", (story_id,))
+
+    def delete_story(self, story_id: int) -> None:
+        """User-facing delete: the story AND its member items must go —
+        keeping the items would just re-cluster them into a new story on
+        the next cycle, so 'deleted' would not stick."""
+        self._delete_story_rows(story_id)
+        self.conn.execute("DELETE FROM items WHERE story_id=?", (story_id,))
+        self.conn.commit()
+
+    def delete_source(self, source_id: int) -> None:
+        """Delete a source with its fetch history and items. Stories that
+        lost all their members are purged by the caller afterwards."""
+        self.conn.execute("DELETE FROM fetch_runs WHERE source_id=?", (source_id,))
+        self.conn.execute("DELETE FROM items WHERE source_id=?", (source_id,))
+        self.conn.execute("DELETE FROM sources WHERE id=?", (source_id,))
+        self.conn.commit()
 
     def story_members(self, story_id: int) -> list[ItemRecord]:
         rows = self.conn.execute("SELECT * FROM items WHERE story_id=? ORDER BY id",

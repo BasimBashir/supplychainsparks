@@ -94,3 +94,23 @@ def test_queue_unscored_band_and_count(env):
     assert [s["title"] for s in unscored] == ["Red Sea attack"]
     assert unscored[0]["band"] == "unscored"
     assert unscored[0]["judge"] is None and unscored[0]["priority"] is None
+
+
+def test_delete_story_removes_story_and_items(env):
+    tc, h, db, story_id = env
+    assert tc.get(f"/api/stories/{story_id}", headers=h).status_code == 200
+    r = tc.post(f"/api/stories/{story_id}/delete", headers=h)
+    assert r.status_code == 200 and r.json()["status"] == "deleted"
+    assert db.get_story(story_id) is None
+    assert db.latest_judge(story_id) is None
+    assert db.story_members(story_id) == []          # items went with it
+    assert tc.get(f"/api/stories/{story_id}", headers=h).status_code == 404
+    assert tc.post(f"/api/stories/{story_id}/delete", headers=h).status_code == 404
+
+
+def test_delete_story_refuses_published(env):
+    tc, h, db, story_id = env
+    db.set_story_status(story_id, "published")
+    r = tc.post(f"/api/stories/{story_id}/delete", headers=h)
+    assert r.status_code == 409
+    assert db.get_story(story_id) is not None        # still there

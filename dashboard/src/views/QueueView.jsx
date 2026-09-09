@@ -22,6 +22,16 @@ export default function QueueView({ onSelect, refreshKey = 0 }) {
     refresh();
   }
 
+  async function remove(s) {
+    if (!window.confirm(`Delete “${s.title}”?\n\nThis removes the story and its ` +
+                        `clipped articles from this PC. It cannot be undone.`))
+      return;
+    try {
+      await apiPost(`/api/stories/${s.id}/delete`);
+      refresh();
+    } catch (e) { setError(String(e)); }
+  }
+
   return (
     <div className="queue">
       <div className="queue-toolbar">
@@ -76,6 +86,9 @@ export default function QueueView({ onSelect, refreshKey = 0 }) {
             <div className="card-actions">
               <button className="btn accent small" onClick={() => select(s.id)}>Select</button>
               <button className="btn subtle small" onClick={() => onSelect?.(s.id)}>Open</button>
+              {s.status !== "published" && (
+                <button className="btn danger small" onClick={() => remove(s)}>Delete</button>
+              )}
             </div>
           </div>
         </div>
