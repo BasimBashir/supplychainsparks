@@ -1,54 +1,39 @@
 # kind: rss  -> url is a feed URL. kind: html -> url is a listing page; link_pattern
 # is a regex the href must match (re.search) to count as an article link.
+#
+# Every feed below was verified reachable with the app's bot user agent and
+# allowed by the site's robots.txt (2026-09-09). Google News RSS and several
+# regional feeds (Arab News, Logistics Middle East, Gulf News, Mawani) were
+# removed: they robots-block or 403/405 non-browser agents, so they produced
+# zero items every cycle.
 sources:
-  - name: Google News - Saudi logistics
+  - name: The Loadstar
     kind: rss
-    url: "https://news.google.com/rss/search?q=%22Saudi%22%20%22logistics%22&hl=en-US&gl=US&ceid=US:en"
-    credibility: 0.6
-    category_hint: logistics
-  - name: Google News - Saudi ports
-    kind: rss
-    url: "https://news.google.com/rss/search?q=%22Saudi%22%20port%20OR%20Jeddah%20OR%20Dammam&hl=en-US&gl=US&ceid=US:en"
-    credibility: 0.6
-    category_hint: ports-shipping
-  - name: Google News - GCC supply chain
-    kind: rss
-    url: "https://news.google.com/rss/search?q=%22supply%20chain%22%20GCC%20OR%20UAE%20OR%20Qatar&hl=en-US&gl=US&ceid=US:en"
-    credibility: 0.6
-    category_hint: trade-policy
-  - name: Google News - Red Sea shipping
-    kind: rss
-    url: "https://news.google.com/rss/search?q=%22Red%20Sea%22%20shipping&hl=en-US&gl=US&ceid=US:en"
-    credibility: 0.6
-    category_hint: ports-shipping
-  - name: Google News - Saudi warehousing
-    kind: rss
-    url: "https://news.google.com/rss/search?q=Saudi%20warehouse%20OR%20warehousing%20OR%20%22free%20zones%22&hl=en-US&gl=US&ceid=US:en"
-    credibility: 0.6
-    category_hint: warehousing
-  - name: Supply Chain Digest
-    kind: rss
-    url: "https://www.scdigest.com/rss.xml"
+    url: "https://theloadstar.com/feed/"
     credibility: 0.8
-    category_hint: null
-  - name: Logistics Middle East
-    kind: rss
-    url: "https://www.logisticsmiddleeast.com/rss/feed"
-    credibility: 0.7
-    category_hint: null
-  - name: Arab News - Business
-    kind: rss
-    url: "https://www.arabnews.com/business/rss.xml"
-    credibility: 0.7
-    category_hint: null
-  - name: Gulf News - Transport
-    kind: rss
-    url: "https://gulfnews.com/rss?generatorName=transport"
-    credibility: 0.7
-    category_hint: transport
-  - name: Mawani press releases
-    kind: html
-    url: "https://mawani.gov.sa/en/media-center/press-releases"
-    link_pattern: "press-release"
-    credibility: 0.9
     category_hint: ports-shipping
+  - name: Splash247
+    kind: rss
+    url: "https://splash247.com/feed/"
+    credibility: 0.7
+    category_hint: ports-shipping
+  - name: gCaptain
+    kind: rss
+    url: "https://gcaptain.com/feed/"
+    credibility: 0.7
+    category_hint: ports-shipping
+  - name: FreightWaves
+    kind: rss
+    url: "https://www.freightwaves.com/rss"
+    credibility: 0.8
+    category_hint: logistics
+  - name: Container News
+    kind: rss
+    url: "https://container-news.com/feed/"
+    credibility: 0.6
+    category_hint: ports-shipping
+  - name: Argaam - Saudi business
+    kind: rss
+    url: "https://www.argaam.com/en/rss/ho-main-news?sectionid=1524"
+    credibility: 0.7
+    category_hint: trade-policy
