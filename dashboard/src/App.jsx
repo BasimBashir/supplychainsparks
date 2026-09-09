@@ -50,6 +50,8 @@ export default function App() {
   const [openStory, setOpenStory] = useState(null);
   const [status, setStatus] = useState(null);
   const [fetching, setFetching] = useState(false);
+  const [flash, setFlash] = useState(null);       // {kind: "ok"|"error", text}
+  const [queueKey, setQueueKey] = useState(0);    // bumped after each fetch cycle
 
   async function refreshStatus() {
     try { setStatus(await apiGet("/api/settings-status")); } catch { setStatus(null); }
@@ -62,13 +64,38 @@ export default function App() {
 
   async function fetchNow() {
     setFetching(true);
+    setFlash(null);
     try {
       const { job_id } = await apiPost("/api/fetch-now");
       const t = setInterval(async () => {
-        const s = await apiGet(`/api/jobs/${job_id}`);
-        if (s.state !== "running") { clearInterval(t); setFetching(false); refreshStatus(); }
+        try {
+          const s = await apiGet(`/api/jobs/${job_id}`);
+          if (s.state === "running") return;
+          clearInterval(t);
+          setFetching(false);
+          if (s.state === "error" || s.error) {
+            setFlash({ kind: "error",
+                       text: `Fetch failed — ${s.error || "unknown error"}` });
+            return;
+          }
+          const r = s.result || {};
+          const errs = r.errors?.length ? ` · ${r.errors.length} source errors` : "";
+          setFlash({ kind: "ok",
+                     text: `${r.items_new ?? 0} new items · `
+                         + `${r.stories_created ?? 0} new stories · `
+                         + `${r.stories_judged ?? 0} judged${errs}` });
+          setQueueKey((k) => k + 1);  // reload the queue with fresh stories
+          refreshStatus();
+        } catch (e) {
+          clearInterval(t);
+          setFetching(false);
+          setFlash({ kind: "error", text: `Fetch failed — ${e}` });
+        }
       }, 1500);
-    } catch { setFetching(false); }
+    } catch (e) {
+      setFetching(false);
+      setFlash({ kind: "error", text: `Fetch failed — ${e}` });
+    }
   }
 
   const tier = status?.default_tier;
@@ -131,10 +158,12 @@ export default function App() {
           </div>
         </div>
 
+        {flash && <div className={`flash ${flash.kind}`}>{flash.text}</div>}
+
         <div className="content">
           {tab === "queue" && (openStory
             ? <StoryDetail storyId={openStory} onBack={() => setOpenStory(null)} />
-            : <QueueView onSelect={setOpenStory} />)}
+            : <QueueView onSelect={setOpenStory} refreshKey={queueKey} />)}
           {tab === "review" && <ReviewView />}
           {tab === "published" && <PublishedView />}
           {tab === "settings" && <Wizard onSaved={refreshStatus} />}

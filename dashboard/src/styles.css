@@ -465,3 +465,35 @@ tr:hover td { background: rgba(255, 255, 255, 0.015); }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* fetch result flash (inline toast under the page head) */
+.flash {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 9px 14px;
+  border-radius: var(--radius);
+  font-size: 12.5px;
+  border: 1px solid var(--stroke);
+  background: var(--surface);
+  color: var(--text-mid);
+  animation: flash-in 160ms ease-out;
+}
+.flash::before {
+  content: "";
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.flash.ok { border-color: rgba(55, 200, 171, 0.35); background: var(--accent-soft); color: var(--accent); }
+.flash.ok::before { background: var(--accent); }
+.flash.error { border-color: rgba(248, 113, 113, 0.35); background: rgba(248, 113, 113, 0.1); color: var(--danger); }
+.flash.error::before { background: var(--danger); }
+@keyframes flash-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .flash { animation: none; }
+}

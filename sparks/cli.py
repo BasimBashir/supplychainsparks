@@ -5,14 +5,11 @@ import argparse
 import pathlib
 import sys
 
-import yaml
-
-from sparks.config import REPO_ROOT, Settings, load_settings
+from sparks.config import Settings, load_settings
 from sparks.db import Database
 from sparks.models import CycleReport, Source
 from sparks.pipeline import replay, run_cycle
-
-SOURCES_SEED = REPO_ROOT / "sources.yaml"
+from sparks.seed import SOURCES_SEED, seed_sources
 
 
 def _db(settings: Settings) -> Database:
@@ -22,14 +19,7 @@ def _db(settings: Settings) -> Database:
 
 def cmd_init(args, settings: Settings) -> int:
     db = _db(settings)
-    data = yaml.safe_load(SOURCES_SEED.read_text(encoding="utf-8")) or {}
-    count = 0
-    for raw in data.get("sources", []):
-        db.upsert_source(Source(name=raw["name"], kind=raw["kind"], url=raw["url"],
-                                credibility=float(raw.get("credibility", 0.5)),
-                                category_hint=raw.get("category_hint"),
-                                link_pattern=raw.get("link_pattern")))
-        count += 1
+    count = seed_sources(db, SOURCES_SEED)
     print(f"seeded {count} sources from {SOURCES_SEED}")
     return 0
 

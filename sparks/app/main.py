@@ -78,6 +78,18 @@ def _quit(server, tray, data_dir) -> None:
     os._exit(0)
 
 
+def _ensure_sources(settings, log) -> None:
+    """First run of a packaged install has an empty db and no CLI init step —
+    seed the bundled default sources so the fetch cycle has work to do."""
+    from sparks.db import Database
+    from sparks.seed import SOURCES_SEED, ensure_seeded
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    db = Database(settings.db_path)
+    seeded = ensure_seeded(db, SOURCES_SEED)
+    if seeded:
+        log.info("seeded %d default sources (first run)", seeded)
+
+
 def _open_window(url: str) -> None:
     """Create a webview window. webview.start() must own the MAIN thread on
     Windows (WebView2 message loop), so we never call it from a worker."""
@@ -93,6 +105,7 @@ def run() -> int:
     log = logging.getLogger(__name__)
     log.info("starting SupplyChainSparks app")
     try:
+        _ensure_sources(settings, log)
         _run_app(settings)
     except Exception:
         log.exception("fatal error in app main loop")

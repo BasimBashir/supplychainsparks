@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { apiGet, apiPost } from "../api.js";
 
-export default function QueueView({ onSelect }) {
+export default function QueueView({ onSelect, refreshKey = 0 }) {
   const [stories, setStories] = useState(null);
   const [band, setBand] = useState("");
   const [error, setError] = useState("");
@@ -12,7 +12,7 @@ export default function QueueView({ onSelect }) {
       setStories(data.stories);
     } catch (e) { setError(String(e)); }
   }
-  useEffect(() => { refresh(); }, [band]);
+  useEffect(() => { refresh(); }, [band, refreshKey]);
 
   async function select(id) {
     await apiPost(`/api/stories/${id}/select`);
