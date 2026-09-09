@@ -333,7 +333,10 @@ class Database:
                            created_at=_parse_dt(r["created_at"]))
 
     def pending_stories(self, limit: int | None = None) -> list[StoryRecord]:
-        q = ("SELECT * FROM stories WHERE judge_status='none' AND status='clustered' ORDER BY id"
+        # 'unscored' stays pending: judging is retried next cycle once a
+        # working tier (api key / local model) becomes available.
+        q = ("SELECT * FROM stories WHERE judge_status IN ('none', 'unscored')"
+             " AND status='clustered' ORDER BY id"
              + (f" LIMIT {int(limit)}" if limit else ""))
         return [self._row_to_story(r) for r in self.conn.execute(q).fetchall()]
 

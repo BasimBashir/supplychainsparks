@@ -1,12 +1,16 @@
 """JudgeService: tier selection, api->local fallback, unscored marking."""
 from __future__ import annotations
 
+import logging
+
 from sparks.config import Settings
 from sparks.context import story_context
 from sparks.db import Database
 from sparks.judge.api import ApiJudge
 from sparks.judge.local import OllamaJudge
 from sparks.judge.schema import PROMPT_VERSION, JudgeError
+
+log = logging.getLogger(__name__)
 
 
 class JudgeService:
@@ -48,12 +52,15 @@ class JudgeService:
         for tier, judge in self._tier_order():
             try:
                 output = judge.judge(ctx, settings=self.settings)
-            except JudgeError:
+            except JudgeError as exc:
+                log.warning("story %s judge failed on %s tier: %s", story_id, tier, exc)
                 continue
             self.db.save_judge_score(story_id, tier=tier, model=self._model_for(tier),
                                      prompt_version=PROMPT_VERSION, output=output)
             self.db.set_story_judge_status(story_id, tier)
             return tier
+        log.warning("story %s left unscored: no judge tier succeeded "
+                    "(check api key / ollama model)", story_id)
         self.db.set_story_judge_status(story_id, "unscored")
         return "unscored"
 

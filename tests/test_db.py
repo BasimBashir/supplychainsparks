@@ -101,3 +101,19 @@ def test_mark_source_health_and_disable(db):
     db.upsert_source(Source(name="Test Feed", kind="rss",
                             url="https://example.com/Test-Feed", enabled=False))
     assert db.all_sources(enabled_only=True) == []
+
+
+def test_unscored_stories_are_retried(db):
+    """A story that failed judging (no key / wrong model) must come back as
+    pending, or it stays unscored forever once a tier becomes available."""
+    sid = _source(db)
+    db.insert_item(sid, FetchedEntry(url="https://example.com/a", title="Story"),
+                   raw_path="r", fetched_at=NOW)
+    story_id = db.create_story(title="Story", primary_item_id=1)
+    assert [s.id for s in db.pending_stories()] == [story_id]
+
+    db.set_story_judge_status(story_id, "unscored")
+    assert [s.id for s in db.pending_stories()] == [story_id]  # still pending
+
+    db.set_story_judge_status(story_id, "local")  # scored stories are not
+    assert [s.id for s in db.pending_stories()] == []

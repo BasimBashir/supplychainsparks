@@ -67,7 +67,8 @@ def test_local_disabled_and_api_fails_marks_unscored(db, settings):
     tier = JudgeService(settings, db, api_judge=FakeJudge(raise_=JudgeError("boom")),
                         local_judge=FakeJudge()).judge_story(story_id)
     assert tier == "unscored"
-    assert db.pending_stories() == []  # no longer pending: marked
+    # unscored stays pending: judging is retried once a tier becomes available
+    assert [s.id for s in db.pending_stories()] == [story_id]
     assert db.latest_judge(story_id) is None
 
 
