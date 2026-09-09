@@ -25,6 +25,7 @@ def _reply(payload):
 
 @pytest.fixture
 def seeded(settings):
+    settings.judge.default_tier = "api"
     settings.judge.api.base_url = "https://api.example/v4"
     settings.judge.api.api_key = "test-key"
     db = Database(settings.db_path)
@@ -69,3 +70,35 @@ def test_generation_blocks_unpublishable_content(seeded, settings):
         GenerationService(settings, db).generate_for_story(story_id, formats=("article",))
     assert "URL" in str(exc.value) or "publishable" in str(exc.value)
     assert db.generations_for(story_id) == []
+
+
+@respx.mock
+def test_local_only_mode_generates_via_ollama(settings):
+    """The bypass: default_tier=local -> generation never touches the cloud API."""
+    settings.judge.default_tier = "local"
+    settings.judge.api.api_key = ""  # no cloud key at all
+    settings.judge.local.model = "qwen2.5:3b"
+    db = Database(settings.db_path)
+    sid = db.upsert_source(Source(name="Reuters", kind="rss", url="https://r.com/rss"))
+    iid = db.insert_item(sid, FetchedEntry("https://r.com/a", "Jeddah expansion", NOW),
+                         "raw", NOW)
+    db.update_item_extraction(iid, "First sentence. Second. " + "word " * 200, None, 205)
+    story_id = db.create_story("Jeddah expansion", iid)
+    db.set_story_ranking(story_id, 88.0, "high", "ports-shipping")
+
+    with respx.mock:
+        ollama = respx.post("http://localhost:11434/api/chat")
+        ollama.side_effect = [
+            # article-en, seo-en, article-ar, seo-ar
+            httpx.Response(200, json={"message": {"content": json.dumps(ARTICLE)}}),
+            httpx.Response(200, json={"message": {"content": json.dumps(SEO)}}),
+            httpx.Response(200, json={"message": {"content": json.dumps(ARTICLE)}}),
+            httpx.Response(200, json={"message": {"content": json.dumps(SEO)}}),
+        ]
+        gen_ids = GenerationService(settings, db).generate_for_story(
+            story_id, formats=("article",))
+    assert len(gen_ids) == 2  # en + ar
+    gens = db.generations_for(story_id)
+    assert all(g["model"] == "qwen2.5:3b" for g in gens)
+    body = json.loads(ollama.calls.last.request.content.decode())
+    assert body["model"] == "qwen2.5:3b"

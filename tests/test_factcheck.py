@@ -23,6 +23,7 @@ CLAIMS = {"claims": [
 
 @pytest.fixture
 def seeded(settings):
+    settings.judge.default_tier = "api"
     settings.judge.api.base_url = "https://api.example/v4"
     settings.judge.api.api_key = "test-key"
     db = Database(settings.db_path)

@@ -1,9 +1,11 @@
-"""GenerationService: story -> article/linkedin content in EN + AR."""
+"""GenerationService: story -> article/linkedin content in EN + AR.
+
+Uses the shared LlmClient, so the tier switch (judge.default_tier = api|local)
+applies here too: "local" = fully offline generation via Ollama, no API key.
+"""
 from __future__ import annotations
 
 import json
-
-import httpx
 
 from sparks.config import Settings
 from sparks.context import story_context
@@ -12,6 +14,7 @@ from sparks.generate.prompt import render_generation_prompt
 from sparks.generate.schema import GeneratedArticle, LinkedInPost, SeoBlock
 from sparks.generate.validate import assert_publishable
 from sparks.judge.api import parse_json_content
+from sparks.llm import LlmClient
 
 
 class GenerationError(Exception):
@@ -19,26 +22,10 @@ class GenerationError(Exception):
 
 
 class GenerationService:
-    def __init__(self, settings: Settings, db: Database,
-                 api_client: httpx.Client | None = None):
+    def __init__(self, settings: Settings, db: Database, llm: LlmClient | None = None):
         self.settings = settings
         self.db = db
-        self._client = api_client
-
-    @property
-    def client(self) -> httpx.Client:
-        if self._client is None:
-            self._client = httpx.Client(timeout=120)
-        return self._client
-
-    def _complete(self, messages: list[dict]) -> str:
-        cfg = self.settings.judge.api
-        resp = self.client.post(
-            f"{cfg.base_url.rstrip('/')}/chat/completions",
-            json={"model": cfg.model, "messages": messages, "temperature": 0.4},
-            headers={"authorization": f"Bearer {cfg.api_key}"})
-        resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"]
+        self.llm = llm or LlmClient(settings)
 
     def generate_for_story(self, story_id: int,
                            formats: tuple[str, ...] = ("article", "linkedin")) -> list[int]:
@@ -51,42 +38,38 @@ class GenerationService:
         if judge:
             ctx.body = f"Gist: {judge.gist}\n\n{ctx.body}"
         blocked = self.db.all_source_names()
+        model = self.llm.model
         try:
             gen_ids: list[int] = []
             if "article" in formats:
                 for language in ("en", "ar"):
-                    article = parse_json_content(
-                        self._complete(render_generation_prompt("article", language, ctx,
-                                                                self.settings)),
-                        GeneratedArticle)
-                    seo = parse_json_content(
-                        self._complete(render_generation_prompt("seo", language, ctx,
-                                                                self.settings)),
-                        SeoBlock)
+                    article = self._complete(GeneratedArticle, "article", language, ctx)
+                    seo = self._complete(SeoBlock, "seo", language, ctx)
                     text = article.to_markdown()
                     violations = assert_publishable(text, blocked)
                     if violations:
                         raise GenerationError(f"not publishable: {violations}")
                     gen_ids.append(self.db.save_generation(
                         story_id=story_id, format="article", language=language,
-                        model=self.settings.judge.api.model,
+                        model=model,
                         prompt_version=f"article_{language}_v1", content=text,
                         seo_slug=seo.slug, seo_description=seo.description,
                         seo_tags=json.dumps(seo.tags)))
             if "linkedin" in formats:
                 for language in ("en", "ar"):
-                    post = parse_json_content(
-                        self._complete(render_generation_prompt("linkedin", language, ctx,
-                                                                self.settings)),
-                        LinkedInPost)
+                    post = self._complete(LinkedInPost, "linkedin", language, ctx)
                     text = post.to_text()
                     violations = assert_publishable(text, blocked)
                     if violations:
                         raise GenerationError(f"not publishable: {violations}")
                     gen_ids.append(self.db.save_generation(
                         story_id=story_id, format="linkedin", language=language,
-                        model=self.settings.judge.api.model,
+                        model=model,
                         prompt_version=f"linkedin_{language}_v1", content=text))
         finally:
             self.db.set_story_status(story_id, "review")
         return gen_ids
+
+    def _complete(self, model_cls, kind: str, language: str, ctx):
+        messages = render_generation_prompt(kind, language, ctx, self.settings)
+        return self.llm.complete_json(messages, model_cls)

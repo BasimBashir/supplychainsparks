@@ -1,14 +1,18 @@
-"""FactCheckService: verify generated claims against source material."""
+"""FactCheckService: verify generated claims against source material.
+
+Uses the shared LlmClient, so the tier switch (judge.default_tier = api|local)
+applies here too.
+"""
 from __future__ import annotations
 
 import importlib.resources
 
-import httpx
 from pydantic import BaseModel, field_validator
 
 from sparks.config import Settings
 from sparks.db import Database
 from sparks.judge.api import parse_json_content
+from sparks.llm import LlmClient
 
 
 class ClaimList(BaseModel):
@@ -23,17 +27,10 @@ class ClaimList(BaseModel):
 
 
 class FactCheckService:
-    def __init__(self, settings: Settings, db: Database,
-                 api_client: httpx.Client | None = None):
+    def __init__(self, settings: Settings, db: Database, llm: LlmClient | None = None):
         self.settings = settings
         self.db = db
-        self._client = api_client
-
-    @property
-    def client(self) -> httpx.Client:
-        if self._client is None:
-            self._client = httpx.Client(timeout=120)
-        return self._client
+        self.llm = llm or LlmClient(settings)
 
     def check_generation(self, generation_id: int) -> int:
         gen = self._generation(generation_id)
@@ -41,14 +38,7 @@ class FactCheckService:
         sources = "\n---\n".join(
             (m.extracted_text or "")[:2000] for m in self.db.story_members(story.id))
         prompt = self._render(gen["content"], sources)
-        cfg = self.settings.judge.api
-        resp = self.client.post(
-            f"{cfg.base_url.rstrip('/')}/chat/completions",
-            json={"model": cfg.model, "messages": prompt, "temperature": 0.0},
-            headers={"authorization": f"Bearer {cfg.api_key}"})
-        resp.raise_for_status()
-        content = resp.json()["choices"][0]["message"]["content"]
-        claims = parse_json_content(content, ClaimList).claims
+        claims = self.llm.complete_json(prompt, ClaimList).claims
         flags = [c for c in claims if c.get("verdict") != "supported"]
         self.db.replace_fact_flags(generation_id, claims)
         return len(flags)
