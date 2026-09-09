@@ -24,10 +24,12 @@ export default function SourcesView() {
     setNote(null);
     try {
       const payload = {
-        name: form.name.trim(), kind: form.kind, url: form.url.trim(),
+        name: form.name.trim(), kind: form.kind,
+        url: form.kind === "search" ? null : form.url.trim(),
+        topic: form.kind === "search" ? form.url.trim() : null,
         credibility: parseFloat(form.credibility) || 0.5,
         category_hint: form.category_hint.trim() || null,
-        link_pattern: form.link_pattern.trim() || null,
+        link_pattern: form.kind === "html" ? (form.link_pattern.trim() || null) : null,
       };
       const r = await apiPost("/api/sources", payload);
       setNote({ kind: "ok", text: `${r.status === "updated" ? "Updated" : "Added"} `
@@ -36,7 +38,8 @@ export default function SourcesView() {
       refresh();
     } catch (e) {
       setNote({ kind: "error",
-                text: `Could not add source — ${e} (name, http(s) url and kind rss|html required)` });
+                text: `Could not add source — ${e} (name + http(s) url, `
+                      + `or a topic for web search, required)` });
     }
   }
 
@@ -52,7 +55,9 @@ export default function SourcesView() {
       <form className="source-form card" onSubmit={addSource}>
         <h3 className="card-title">Add a source</h3>
         <p className="card-sub">RSS feeds work best. HTML pages are scanned for
-          links matching a pattern (default: <code>press|news|article</code>).</p>
+          links matching a pattern (default: <code>press|news|article</code>).
+          A <b>web search</b> source runs a keyless DuckDuckGo news search on
+          your topic every cycle — add as many topics as you like.</p>
         <div className="form-grid">
           <label>
             <span>Name</span>
@@ -64,12 +69,15 @@ export default function SourcesView() {
             <select value={form.kind} onChange={(e) => set("kind", e.target.value)}>
               <option value="rss">RSS feed</option>
               <option value="html">HTML page</option>
+              <option value="search">Web search (topic)</option>
             </select>
           </label>
           <label className="span-2">
-            <span>URL</span>
+            <span>{form.kind === "search" ? "Topic" : "URL"}</span>
             <input value={form.url} onChange={(e) => set("url", e.target.value)}
-                   placeholder="https://example.com/rss" required />
+                   placeholder={form.kind === "search"
+                     ? "“Red Sea” shipping disruptions"
+                     : "https://example.com/rss"} required />
           </label>
           <label>
             <span>Credibility (0–1)</span>
@@ -115,7 +123,8 @@ export default function SourcesView() {
               {s.category_hint && <span className="badge ghost">{s.category_hint}</span>}
             </div>
             <h3 className="story-title">{s.name}</h3>
-            <p className="source-url">{s.url}</p>
+            <p className="source-url">{s.kind === "search"
+              ? `🔍 topic — ${s.url}` : s.url}</p>
             <span className="cred">credibility {Number(s.credibility).toFixed(1)}</span>
           </div>
           <button className={`btn subtle small ${s.enabled ? "" : "accent"}`}

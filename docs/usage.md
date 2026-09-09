@@ -109,21 +109,28 @@ fetch manually with **Fetch now**.
 ### Sources tab — manage what gets fetched
 
 The **Sources** tab lists every source the engine fetches: name, type
-(RSS/HTML), health, credibility, and whether it's enabled. Use it to:
+(RSS/HTML/web search), health, credibility, and whether it's enabled. Use it to:
 
 - **Add a source** — name, type, URL. Credibility (0–1) feeds the ranking;
   a category hint (e.g. `ports-shipping`) helps the judge. For HTML pages,
   a link pattern (regex, default `press|news|article`) decides which links
   count as stories. Adding a URL that already exists updates it instead of
   duplicating.
+- **Add a web search topic** — type **Web search (topic)** and type any topic
+  (`"Red Sea" shipping disruptions`, `Saudi port expansions`, …). Every fetch
+  cycle runs a keyless DuckDuckGo news search for the topic and treats the
+  results like any other source — no API key, and it works in local-only
+  mode. Add as many topics as you want. Search results carry a snippet: if
+  an article page blocks our fetcher (robots, paywall, dead link), the story
+  is judged from the snippet instead of being dropped.
 - **Disable / enable** — a disabled source stays in the list but is skipped by
   every fetch (useful when a feed goes bad). Re-enable the same way.
 
-The first app run seeds ten default sources (Google News queries for Saudi
-logistics/ports/GCC supply chain, Red Sea shipping, plus regional trade press).
-Closing the window with the **X button hides the app to the tray** — it keeps
-fetching on schedule. Tray → **Open Dashboard** (or launching the exe again)
-brings the window back; tray → **Quit** is the only way the app exits.
+The first app run seeds six default sources (The Loadstar, Splash247,
+gCaptain, FreightWaves, Container News, Argaam) — all verified to allow our
+bot. Closing the window with the **X button hides the app to the tray** — it
+keeps fetching on schedule. Tray → **Open Dashboard** (or launching the exe
+again) brings the window back; tray → **Quit** is the only way the app exits.
 
 ## Power-user CLI
 

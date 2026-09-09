@@ -67,6 +67,30 @@ def test_toggle_source_enable_disable(settings):
     assert [s for s in db.all_sources(enabled_only=True) if s.id == sid]
 
 
+def test_add_search_source_with_topic(settings):
+    tc, h, db = env(settings)
+    r = tc.post("/api/sources", headers=h, json={
+        "name": "Red Sea watch", "kind": "search", "topic": "Red Sea shipping attacks",
+        "credibility": 0.6})
+    assert r.status_code == 200
+    assert r.json()["status"] == "added"
+    listed = tc.get("/api/sources", headers=h).json()["sources"]
+    match = [s for s in listed if s["name"] == "Red Sea watch"]
+    assert match and match[0]["kind"] == "search"
+    assert match[0]["url"] == "Red Sea shipping attacks"  # topic stored in url
+    # ...and it is fetched like any other source
+    assert [s for s in db.all_sources(enabled_only=True) if s.kind == "search"]
+
+
+def test_add_search_source_requires_topic(settings):
+    tc, h, db = env(settings)
+    no_topic = tc.post("/api/sources", headers=h, json={"name": "x", "kind": "search"})
+    empty_topic = tc.post("/api/sources", headers=h,
+                          json={"name": "x", "kind": "search", "topic": "  "})
+    assert no_topic.status_code == 400
+    assert empty_topic.status_code == 400
+
+
 def test_toggle_requires_valid_body(settings):
     tc, h, db = env(settings)
     listed = tc.get("/api/sources", headers=h).json()["sources"]

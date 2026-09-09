@@ -107,6 +107,14 @@ def replay(settings: Settings, db: Database | None = None, skip_judge: bool = Fa
         if extracted is not None:
             db.update_item_extraction(item.id, extracted.text, extracted.language,
                                       extracted.word_count)
+        else:
+            # search items keep their snippet when the page won't extract
+            source = db.get_source(item.source_id)
+            summary = (item.summary or "").split()
+            if (source is not None and source.kind == "search"
+                    and len(summary) >= 10):
+                db.update_item_extraction(item.id, " ".join(summary), None,
+                                          len(summary))
 
     all_items = db.window_items(days=3650)
     for cluster in build_clusters(all_items):

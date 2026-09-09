@@ -10,13 +10,13 @@ from sparks.models import (
     FetchedEntry, ItemRecord, JudgeScoreRow, Source, SourceRun, StoryRecord,
 )
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS sources (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
-    kind TEXT NOT NULL CHECK (kind IN ('rss', 'html')),
+    kind TEXT NOT NULL CHECK (kind IN ('rss', 'html', 'search')),
     url TEXT NOT NULL UNIQUE,
     credibility REAL NOT NULL DEFAULT 0.5,
     category_hint TEXT,
@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS items (
     published_at TEXT,
     fetched_at TEXT NOT NULL,
     raw_path TEXT NOT NULL,
+    summary TEXT,
     extracted_text TEXT,
     language TEXT,
     word_count INTEGER,
@@ -136,8 +137,40 @@ class Database:
         self.conn = sqlite3.connect(self.path, check_same_thread=False, timeout=30.0)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
+        self._migrate()
         self.conn.execute("PRAGMA journal_mode=WAL")
         self.conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+
+    def _migrate(self) -> None:
+        """In-place upgrades for databases created by older app versions."""
+        version = self.conn.execute("PRAGMA user_version").fetchone()[0]
+        if version < 3:
+            # v3: 'search' source kind + items.summary (web-search snippets).
+            # CREATE TABLE IF NOT EXISTS above cannot change a live CHECK
+            # constraint, so the sources table is rebuilt in place.
+            ddl = self.conn.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='sources'"
+            ).fetchone()
+            if ddl and "'search'" not in ddl[0]:
+                self.conn.executescript(
+                    """CREATE TABLE sources_v3 (
+                           id INTEGER PRIMARY KEY AUTOINCREMENT,
+                           name TEXT NOT NULL,
+                           kind TEXT NOT NULL CHECK (kind IN ('rss', 'html', 'search')),
+                           url TEXT NOT NULL UNIQUE,
+                           credibility REAL NOT NULL DEFAULT 0.5,
+                           category_hint TEXT, link_pattern TEXT,
+                           enabled INTEGER NOT NULL DEFAULT 1,
+                           healthy INTEGER NOT NULL DEFAULT 1,
+                           last_fetch_at TEXT,
+                           created_at TEXT NOT NULL DEFAULT (datetime('now')));
+                       INSERT INTO sources_v3 SELECT * FROM sources;
+                       DROP TABLE sources;
+                       ALTER TABLE sources_v3 RENAME TO sources;""")
+            item_cols = [r["name"] for r in self.conn.execute("PRAGMA table_info(items)")]
+            if "summary" not in item_cols:
+                self.conn.execute("ALTER TABLE items ADD COLUMN summary TEXT")
+            self.conn.commit()
 
     def close(self) -> None:
         self.conn.close()
@@ -219,9 +252,9 @@ class Database:
             return None
         cur = self.conn.execute(
             """INSERT INTO items (source_id, url, url_key, title, title_key,
-               published_at, fetched_at, raw_path) VALUES (?,?,?,?,?,?,?,?)""",
+               published_at, fetched_at, raw_path, summary) VALUES (?,?,?,?,?,?,?,?,?)""",
             (source_id, entry.url, url_key, entry.title, title_key(entry.title),
-             _iso(entry.published_at), _iso(fetched_at), raw_path))
+             _iso(entry.published_at), _iso(fetched_at), raw_path, entry.summary))
         self.conn.commit()
         return cur.lastrowid
 
@@ -230,6 +263,7 @@ class Database:
                           url_key=r["url_key"], title=r["title"], title_key=r["title_key"],
                           published_at=_parse_dt(r["published_at"]),
                           fetched_at=_parse_dt(r["fetched_at"]), raw_path=r["raw_path"],
+                          summary=r["summary"],
                           extracted_text=r["extracted_text"], language=r["language"],
                           word_count=r["word_count"], status=r["status"],
                           story_id=r["story_id"])

@@ -67,3 +67,20 @@ test("shows an error when adding an invalid url", async () => {
 
   expect(await screen.findByText(/400/)).toBeInTheDocument();
 });
+
+test("adds a web-search source by topic", async () => {
+  const user = userEvent.setup();
+  render(<SourcesView />);
+  expect(await screen.findByText("Google News - Saudi ports")).toBeInTheDocument();
+
+  await user.selectOptions(screen.getByLabelText(/type/i), "search");
+  await user.type(screen.getByLabelText(/name/i), "Red Sea watch");
+  const topicInput = screen.getByLabelText(/topic/i);
+  await user.type(topicInput, "Red Sea shipping attacks");
+  await user.click(screen.getByRole("button", { name: /add source/i }));
+
+  expect(apiPost).toHaveBeenCalledWith("/api/sources",
+    expect.objectContaining({ name: "Red Sea watch", kind: "search",
+                               topic: "Red Sea shipping attacks", url: null }));
+  expect(await screen.findByText(/added/i)).toBeInTheDocument();
+});

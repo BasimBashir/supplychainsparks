@@ -8,7 +8,7 @@ from datetime import datetime
 @dataclass
 class Source:
     name: str
-    kind: str                      # 'rss' | 'html'
+    kind: str                      # 'rss' | 'html' | 'search' (topic in url)
     url: str
     credibility: float = 0.5       # 0.0-1.0 editorial trust weight
     category_hint: str | None = None
@@ -24,6 +24,7 @@ class FetchedEntry:
     url: str
     title: str
     published_at: datetime | None = None
+    summary: str | None = None     # snippet (search results / feed description)
 
 
 @dataclass
@@ -37,6 +38,7 @@ class ItemRecord:
     published_at: datetime | None
     fetched_at: datetime
     raw_path: str
+    summary: str | None = None     # search snippet kept for extraction fallback
     extracted_text: str | None = None
     language: str | None = None
     word_count: int | None = None

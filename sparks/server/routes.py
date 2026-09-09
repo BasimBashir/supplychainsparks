@@ -79,23 +79,30 @@ def sources(request: Request):
 
 @router.post("/sources")
 def add_source(request: Request, body: dict):
-    """Add a source (or update it when the same URL already exists)."""
+    """Add a source (or update it when the same URL already exists).
+    Search sources take a free-text topic instead of a URL."""
     from sparks.models import Source
-    name, kind, url = body.get("name"), body.get("kind"), body.get("url")
-    if not name or not url:
-        raise HTTPException(400, "name and url required")
-    if kind not in ("rss", "html"):
-        raise HTTPException(400, "kind must be rss|html")
-    if not url.startswith(("http://", "https://")):
-        raise HTTPException(400, "url must start with http:// or https://")
+    name, kind = body.get("name"), body.get("kind")
+    if not name:
+        raise HTTPException(400, "name required")
+    if kind not in ("rss", "html", "search"):
+        raise HTTPException(400, "kind must be rss|html|search")
+    if kind == "search":
+        url = (body.get("topic") or body.get("url") or "").strip()
+        if not url:
+            raise HTTPException(400, "topic required for search sources")
+    else:
+        url = (body.get("url") or "").strip()
+        if not url.startswith(("http://", "https://")):
+            raise HTTPException(400, "url must start with http:// or https://")
     db = _db(request)
     existing = db.all_sources(enabled_only=False)
     db.upsert_source(Source(
-        name=name.strip(), kind=kind, url=url.strip(),
+        name=name.strip(), kind=kind, url=url,
         credibility=float(body.get("credibility", 0.5) or 0.5),
         category_hint=body.get("category_hint") or None,
         link_pattern=body.get("link_pattern") or None))
-    verb = "updated" if any(s.url == url.strip() for s in existing) else "added"
+    verb = "updated" if any(s.url == url for s in existing) else "added"
     return {"status": verb}
 
 

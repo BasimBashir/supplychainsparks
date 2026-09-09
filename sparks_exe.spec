@@ -12,6 +12,7 @@ hiddenimports = [
     "uvicorn.logging", "uvicorn.loops.auto", "uvicorn.protocols.http.auto",
     "uvicorn.protocols.http.h11_impl",
     "apscheduler.schedulers.background", "pystray._win32",
+    "ddgs", "primp",
 ]
 a = Analysis(["sparks/app/launch.py"], pathex=[str(root)], datas=datas,
              hiddenimports=hiddenimports, noarchive=False)
