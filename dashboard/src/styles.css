@@ -240,6 +240,7 @@ button { font: inherit; cursor: pointer; }
 .story-card.band-high::before { background: var(--band-high); }
 .story-card.band-medium::before { background: var(--band-medium); }
 .story-card.band-low::before { background: var(--band-low); }
+.story-card.band-unscored::before { background: #94a3b8; }
 
 .score-block { text-align: center; padding-top: 2px; }
 .score-num {
@@ -270,6 +271,26 @@ button { font: inherit; cursor: pointer; }
 .badge.high { background: rgba(248, 113, 113, 0.13); color: var(--band-high); }
 .badge.medium { background: rgba(240, 180, 41, 0.13); color: var(--band-medium); }
 .badge.low { background: rgba(87, 199, 133, 0.13); color: var(--band-low); }
+.badge.unscored { background: rgba(148, 163, 184, 0.13); color: #94a3b8; }
+
+.unscored-note {
+  padding: 10px 14px;
+  border: 1px dashed var(--stroke);
+  border-radius: 8px;
+  background: rgba(148, 163, 184, 0.06);
+  color: var(--text-mid);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.unscored-note .link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+}
 .badge.ghost { background: var(--surface-2); color: var(--text-mid); font-weight: 500; }
 .story-title {
   margin: 7px 0 4px;

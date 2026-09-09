@@ -4,12 +4,14 @@ import { apiGet, apiPost } from "../api.js";
 export default function QueueView({ onSelect, refreshKey = 0 }) {
   const [stories, setStories] = useState(null);
   const [band, setBand] = useState("");
+  const [unscoredCount, setUnscoredCount] = useState(0);
   const [error, setError] = useState("");
 
   async function refresh() {
     try {
       const data = await apiGet(`/api/queue${band ? `?band=${band}` : ""}`);
       setStories(data.stories);
+      setUnscoredCount(data.unscored_count ?? 0);
     } catch (e) { setError(String(e)); }
   }
   useEffect(() => { refresh(); }, [band, refreshKey]);
@@ -23,7 +25,7 @@ export default function QueueView({ onSelect, refreshKey = 0 }) {
   return (
     <div className="queue">
       <div className="queue-toolbar">
-        {["", "high", "medium", "low"].map((b) => (
+        {["", "high", "medium", "low", "unscored"].map((b) => (
           <button key={b} className={`chip ${band === b ? "active" : ""}`}
                   onClick={() => setBand(b)}>
             {b === "" ? "all priorities" : b}
@@ -33,11 +35,22 @@ export default function QueueView({ onSelect, refreshKey = 0 }) {
 
       {error && <p className="empty">{error}</p>}
 
+      {band !== "unscored" && unscoredCount > 0 && (
+        <div className="unscored-note">
+          ⚖ {unscoredCount} stories waiting to be scored — no judge is available
+          (missing API key or Ollama model). They rank automatically once judging
+          works.{" "}
+          <button className="link" onClick={() => setBand("unscored")}>Show them</button>
+        </div>
+      )}
+
       {stories !== null && !stories.length && !error && (
         <div className="empty">
           <span className="big">⚡</span>
-          The queue is empty. Run a fetch — stories appear here ranked by
-          editorial priority.
+          {band === "unscored"
+            ? "Nothing waiting — every story is scored."
+            : <>The queue is empty. Run a fetch — stories appear here ranked by
+               editorial priority.</>}
         </div>
       )}
 

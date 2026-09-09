@@ -341,11 +341,24 @@ class Database:
         return [self._row_to_story(r) for r in self.conn.execute(q).fetchall()]
 
     def queue_stories(self, limit: int = 50, band: str | None = None) -> list[StoryRecord]:
+        if band == "unscored":
+            # fetched + clustered, but no judge tier succeeded yet: visible in
+            # the app (never a silent dead queue), ranked once judging works
+            q = ("SELECT * FROM stories WHERE status='clustered'"
+                 " AND judge_status IN ('none', 'unscored')"
+                 f" ORDER BY id DESC LIMIT {int(limit)}")
+            return [self._row_to_story(r) for r in self.conn.execute(q).fetchall()]
         q = ("SELECT * FROM stories WHERE status='ranked'"
              + (" AND band=?" if band else "")
              + " ORDER BY priority DESC" + f" LIMIT {int(limit)}")
         params = (band,) if band else ()
         return [self._row_to_story(r) for r in self.conn.execute(q, params).fetchall()]
+
+    def count_unscored(self) -> int:
+        row = self.conn.execute(
+            "SELECT COUNT(*) c FROM stories WHERE status='clustered'"
+            " AND judge_status IN ('none', 'unscored')").fetchone()
+        return row["c"]
 
     def set_story_judge_status(self, story_id: int, judge_status: str) -> None:
         self.conn.execute("UPDATE stories SET judge_status=?, updated_at=? WHERE id=?",

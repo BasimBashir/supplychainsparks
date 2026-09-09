@@ -75,3 +75,22 @@ def test_select_and_fetch_now(env, monkeypatch):
         if tc.get(f"/api/jobs/{job_id}", headers=h).json()["state"] != "running":
             break
     assert tc.get(f"/api/jobs/{job_id}", headers=h).json()["state"] == "done"
+
+
+def test_queue_unscored_band_and_count(env):
+    """Unscored stories must be visible in the app, not a silent empty queue."""
+    tc, h, db, story_id = env
+    sid2 = db.upsert_source(Source(name="AP", kind="rss", url="https://ap.com/rss"))
+    iid2 = db.insert_item(sid2, FetchedEntry("https://ap.com/b", "Red Sea attack", NOW),
+                          "raw", NOW)
+    story2 = db.create_story("Red Sea attack", iid2)
+    db.set_story_judge_status(story2, "unscored")
+
+    all_q = tc.get("/api/queue", headers=h).json()
+    assert all_q["unscored_count"] == 1
+    assert "Red Sea attack" not in [s["title"] for s in all_q["stories"]]
+
+    unscored = tc.get("/api/queue?band=unscored", headers=h).json()["stories"]
+    assert [s["title"] for s in unscored] == ["Red Sea attack"]
+    assert unscored[0]["band"] == "unscored"
+    assert unscored[0]["judge"] is None and unscored[0]["priority"] is None

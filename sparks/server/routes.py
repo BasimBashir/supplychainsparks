@@ -27,7 +27,8 @@ def queue(request: Request, band: str | None = None, n: int = 50):
     for s in stories:
         judge = db.latest_judge(s.id)
         out.append({
-            "id": s.id, "title": s.title, "priority": s.priority, "band": s.band,
+            "id": s.id, "title": s.title, "priority": s.priority,
+            "band": s.band or ("unscored" if band == "unscored" else s.band),
             "category": s.category, "status": s.status, "n_sources": s.n_sources,
             "judge": {"gist": judge.gist, "category": judge.suggested_category,
                       "rationale": judge.rationale_market_impact,
@@ -36,7 +37,7 @@ def queue(request: Request, band: str | None = None, n: int = 50):
                                  "impact": judge.market_impact,
                                  "novelty": judge.novelty}} if judge else None,
         })
-    return {"stories": out}
+    return {"stories": out, "unscored_count": db.count_unscored()}
 
 
 @router.get("/stories/{story_id}")

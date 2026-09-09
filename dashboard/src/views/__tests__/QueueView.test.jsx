@@ -1,7 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { vi, test, expect } from "vitest";
+import { vi, test, expect, afterEach } from "vitest";
 import QueueView from "../QueueView.jsx";
+import { apiGet } from "../../api.js";
 
 vi.mock("../../api.js", () => ({
   apiGet: vi.fn(async () => ({
@@ -14,6 +15,7 @@ vi.mock("../../api.js", () => ({
   })),
   apiPost: vi.fn(async () => ({ status: "selected" })),
 }));
+afterEach(cleanup);   // vitest config has no globals:true -> no RTL auto-cleanup
 
 test("renders ranked story with rationale and selects it", async () => {
   const onSelect = vi.fn();
@@ -23,4 +25,13 @@ test("renders ranked story with rationale and selects it", async () => {
   expect(screen.getByText("3 sources")).toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: /select/i }));
   expect(onSelect).toHaveBeenCalledWith(7);
+});
+
+test("surfaces unscored stories when no judge is available", async () => {
+  apiGet.mockResolvedValueOnce({ stories: [], unscored_count: 12 });
+  render(<QueueView onSelect={() => {}} />);
+
+  expect(await screen.findByText(/12 stories waiting to be scored/i)).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: /show them/i }));
+  expect(apiGet).toHaveBeenCalledWith("/api/queue?band=unscored");
 });
