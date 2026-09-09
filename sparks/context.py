@@ -12,6 +12,10 @@ _SENTENCE_RE = re.compile(r"(?<=[.!?])\s+")
 
 def story_context(db: Database, story: StoryRecord) -> StoryContext:
     members = db.story_members(story.id)
+    if not members:
+        # re-clustering emptied this story; purge_orphan_stories normally
+        # removes it, but never crash the whole judging phase over one story
+        raise ValueError(f"story {story.id} has no member items")
     primary = next((m for m in members if m.id == story.primary_item_id), members[0])
     text = (primary.extracted_text or "").strip()
     sentences = _SENTENCE_RE.split(text)

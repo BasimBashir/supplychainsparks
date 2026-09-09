@@ -308,6 +308,25 @@ class Database:
                           (story_id, item_id))
         self.conn.commit()
 
+    def purge_orphan_stories(self) -> int:
+        """Delete stories left with no member items.
+
+        Re-clustering can steal every item from an old story into a newer
+        one; the emptied story can never be judged or published, and would
+        otherwise sit in the pending queue forever (and crash judging)."""
+        orphans = [r["id"] for r in self.conn.execute(
+            """SELECT id FROM stories s
+               WHERE NOT EXISTS (SELECT 1 FROM items i WHERE i.story_id = s.id)
+                 AND s.status != 'published'""").fetchall()]
+        for story_id in orphans:
+            self.conn.execute("DELETE FROM publications WHERE story_id=?", (story_id,))
+            self.conn.execute("DELETE FROM generations WHERE story_id=?", (story_id,))
+            self.conn.execute("DELETE FROM judge_scores WHERE story_id=?", (story_id,))
+            self.conn.execute("DELETE FROM stories WHERE id=?", (story_id,))
+        if orphans:
+            self.conn.commit()
+        return len(orphans)
+
     def story_members(self, story_id: int) -> list[ItemRecord]:
         rows = self.conn.execute("SELECT * FROM items WHERE story_id=? ORDER BY id",
                                  (story_id,)).fetchall()

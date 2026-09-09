@@ -1,6 +1,7 @@
 """Pipeline orchestration: fetch -> content -> extract -> cluster -> judge -> rank."""
 from __future__ import annotations
 
+import logging
 import pathlib
 from datetime import datetime, timezone
 
@@ -11,6 +12,8 @@ from sparks.fetch.runner import ContentFetcher, FetchRunner
 from sparks.judge.service import JudgeService
 from sparks.models import CycleReport
 from sparks.rank import band_for, compute_priority
+
+log = logging.getLogger(__name__)
 
 
 def run_cycle(settings: Settings, db: Database | None = None,
@@ -39,6 +42,9 @@ def run_cycle(settings: Settings, db: Database | None = None,
         for member_id in cluster.member_item_ids:
             db.assign_story(member_id, story_id)
         report.stories_created += 1
+    purged = db.purge_orphan_stories()   # re-clustering may have emptied old stories
+    if purged:
+        log.info("purged %d orphan stories (items re-clustered away)", purged)
 
     service = judge_service or JudgeService(settings, db, api_judge=api_judge,
                                             local_judge=local_judge)

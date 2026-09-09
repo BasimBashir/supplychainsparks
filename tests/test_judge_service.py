@@ -86,3 +86,56 @@ def test_judge_pending_counts(db, settings):
     judged, unscored = JudgeService(settings, db, api_judge=FakeJudge(),
                                     local_judge=FakeJudge()).judge_pending()
     assert (judged, unscored) == (1, 0)
+
+
+def test_orphan_story_does_not_crash_judging(db, settings):
+    # re-clustering can steal every member from an old story; judging it
+    # used to raise IndexError and silently kill the whole cycle
+    story_id = _story(db)
+    db.conn.execute("UPDATE items SET story_id=NULL WHERE story_id=?", (story_id,))
+    db.conn.commit()
+    tier = JudgeService(settings, db, api_judge=FakeJudge(),
+                        local_judge=FakeJudge()).judge_story(story_id)
+    assert tier == "unscored"
+    assert db.get_story(story_id).judge_status == "unscored"
+
+
+def test_judge_pending_isolates_unexpected_errors(db, settings):
+    good = _story(db)
+    now = datetime(2026, 9, 8, tzinfo=timezone.utc)
+    sid = db.upsert_source(Source(name="T", kind="rss", url="https://t.com/rss"))
+    iid = db.insert_item(sid, FetchedEntry("https://t.com/a", "boom story", now),
+                         "raw/t.html", now)
+    db.update_item_extraction(iid, "Lead sentence. " + "word " * 200,
+                              language=None, word_count=202)
+    broken = db.create_story(title="boom story", primary_item_id=iid)
+
+    class ExplodingJudge:
+        def judge(self, ctx, settings=None):
+            if ctx.title == "boom story":
+                raise RuntimeError("unexpected")   # not a JudgeError
+            return VALID
+
+    judged, unscored = JudgeService(settings, db, api_judge=ExplodingJudge(),
+                                    local_judge=ExplodingJudge()).judge_pending()
+    assert (judged, unscored) == (1, 1)
+    assert db.latest_judge(good) is not None
+    assert db.get_story(broken).judge_status == "unscored"
+
+
+def test_run_cycle_purges_orphan_stories(db, settings):
+    from sparks.pipeline import run_cycle
+    story_id = _story(db)
+    db.conn.execute("UPDATE items SET story_id=NULL WHERE story_id=?", (story_id,))
+    db.conn.commit()
+
+    class NoFetch:
+        def run(self):
+            return []
+
+    class NoJudge:
+        def judge_pending(self):
+            return 0, 0
+
+    run_cycle(settings, db=db, fetch_runner=NoFetch(), judge_service=NoJudge())
+    assert db.get_story(story_id) is None   # emptied story is gone

@@ -48,7 +48,12 @@ class JudgeService:
             pending = [s for s in story_row if s.id == story_id]
         if not pending:
             return "unscored"
-        ctx = self._context_for(pending[0])
+        try:
+            ctx = self._context_for(pending[0])
+        except ValueError as exc:
+            log.warning("story %s cannot be judged: %s", story_id, exc)
+            self.db.set_story_judge_status(story_id, "unscored")
+            return "unscored"
         for tier, judge in self._tier_order():
             try:
                 output = judge.judge(ctx, settings=self.settings)
@@ -72,7 +77,13 @@ class JudgeService:
     def judge_pending(self, limit: int | None = None) -> tuple[int, int]:
         judged = unscored = 0
         for story in self.db.pending_stories(limit=limit):
-            result = self.judge_story(story.id)
+            try:
+                result = self.judge_story(story.id)
+            except Exception:
+                # one broken story must never kill the cycle for all others
+                log.exception("story %s judge raised unexpectedly", story.id)
+                self.db.set_story_judge_status(story.id, "unscored")
+                result = "unscored"
             if result == "unscored":
                 unscored += 1
             else:
