@@ -20,9 +20,9 @@ publish:
 judge:
   default_tier: api            # api | local
   api:
-    base_url: "https://open.bigmodel.cn/api/paas/v4"   # any OpenAI-compatible endpoint
-    model: "glm-4-flash"
-    api_key: "env:SPARKS_API_KEY"                       # env:VARNAME resolves at load
+    base_url: "https://openrouter.ai/api/v1"   # any OpenAI-compatible endpoint
+    model: "openrouter/auto"                   # any vendor/model on OpenRouter
+    api_key: "env:SPARKS_API_KEY"              # env:VARNAME resolves at load
   local:
     enabled: true
     ollama_url: "http://localhost:11434"

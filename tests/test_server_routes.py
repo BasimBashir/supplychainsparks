@@ -19,7 +19,7 @@ def env(settings):
                          "raw", NOW)
     story_id = db.create_story("Jeddah expansion", iid)
     from sparks.judge.schema import JudgeOutput
-    db.save_judge_score(story_id, tier="api", model="glm-4-flash",
+    db.save_judge_score(story_id, tier="api", model="qwen/qwen3-235b-a22b",
                         prompt_version="judge_v1",
                         output=JudgeOutput(
                             supply_chain_relevance=9, saudi_gcc_relevance=10,

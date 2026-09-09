@@ -37,8 +37,8 @@ class PublishConfig:
 
 @dataclass
 class ApiJudgeConfig:
-    base_url: str = "https://open.bigmodel.cn/api/paas/v4"
-    model: str = "glm-4-flash"
+    base_url: str = "https://openrouter.ai/api/v1"   # any OpenAI-compatible API
+    model: str = "openrouter/auto"                    # any vendor/model on it
     api_key: str = ""
 
 
@@ -122,23 +122,41 @@ def _default_data_dir() -> pathlib.Path:
     return pathlib.Path.home() / ".local" / "share" / "supplychainsparks"
 
 
-def read_secrets(settings_path) -> dict:
-    """Secrets live in secrets.yaml next to the settings file (gitignored)."""
+def secrets_path(data_dir) -> pathlib.Path:
+    """Secrets live in the user data dir (writable when installed, survives
+    app updates) — never next to the exe or inside the build output."""
+    return pathlib.Path(data_dir) / "secrets.yaml"
+
+
+def read_secrets(data_dir) -> dict:
     import yaml
-    path = pathlib.Path(settings_path).parent / "secrets.yaml"
+    path = secrets_path(data_dir)
     if not path.exists():
         return {}
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
-def write_secrets(settings_path, values: dict) -> None:
+def write_secrets(data_dir, values: dict) -> None:
     import yaml
-    path = pathlib.Path(settings_path).parent / "secrets.yaml"
-    data: dict = {}
-    if path.exists():
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    path = secrets_path(data_dir)
+    data: dict = read_secrets(data_dir)
     data.update({k: v for k, v in values.items() if v is not None})
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.safe_dump(data), encoding="utf-8")
+
+
+def _migrate_legacy_secrets(settings_path, data_dir) -> dict:
+    """Pre-2026-09 builds stored secrets.yaml next to the settings file (the
+    bundled settings.yaml dir — wiped on every reinstall and read-only under
+    Program Files). Move them to the data dir once."""
+    legacy = pathlib.Path(settings_path).parent / "secrets.yaml"
+    if not legacy.exists():
+        return {}
+    secrets = yaml.safe_load(legacy.read_text(encoding="utf-8")) or {}
+    if secrets:
+        write_secrets(data_dir, secrets)
+    legacy.unlink()
+    return secrets
 
 
 def load_settings(path: pathlib.Path | str | None = None) -> Settings:
@@ -171,7 +189,9 @@ def load_settings(path: pathlib.Path | str | None = None) -> Settings:
     if isinstance(raw.get("publish"), dict):
         _merge(settings.publish, raw["publish"])
 
-    secrets = read_secrets(path)
+    secrets = read_secrets(data_dir)
+    if not secrets:
+        secrets = _migrate_legacy_secrets(path, data_dir)
     if secrets.get("api_key"):
         settings.judge.api.api_key = secrets["api_key"]
     if secrets.get("repo_url"):
@@ -182,6 +202,8 @@ def load_settings(path: pathlib.Path | str | None = None) -> Settings:
         settings.judge.default_tier = secrets["default_tier"]
     if secrets.get("api_model"):
         settings.judge.api.model = secrets["api_model"]
+    if secrets.get("api_base_url"):
+        settings.judge.api.base_url = secrets["api_base_url"]
     if secrets.get("local_model"):
         settings.judge.local.model = secrets["local_model"]
     if secrets.get("schedule_hours") is not None:

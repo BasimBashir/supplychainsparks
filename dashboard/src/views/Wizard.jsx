@@ -4,7 +4,8 @@ import { apiGet, apiPost } from "../api.js";
 export default function Wizard({ onSaved }) {
   const [status, setStatus] = useState(null);
   const [form, setForm] = useState({
-    default_tier: "api", api_key: "", api_model: "glm-4-flash",
+    default_tier: "api", api_key: "", api_model: "openrouter/auto",
+    api_base_url: "https://openrouter.ai/api/v1",
     local_model: "qwen2.5:3b", repo_url: "", git_token: "", schedule_hours: 6,
   });
   const [saved, setSaved] = useState("");
@@ -18,7 +19,9 @@ export default function Wizard({ onSaved }) {
         ...f,
         default_tier: s.default_tier || "api",
         api_model: s.api_model || f.api_model,
+        api_base_url: s.api_base_url || f.api_base_url,
         local_model: s.local_model || f.local_model,
+        repo_url: s.repo_url || "",
         schedule_hours: s.schedule_hours ?? f.schedule_hours,
       }));
     } catch { /* server away */ }
@@ -53,10 +56,10 @@ export default function Wizard({ onSaved }) {
           <button type="button"
                   className={`tier-card ${form.default_tier === "api" ? "selected" : ""}`}
                   onClick={() => setForm({ ...form, default_tier: "api" })}>
-            <div className="t-name">☁️ Cloud API</div>
+            <div className="t-name">☁️ Cloud API · OpenRouter</div>
             <div className="t-desc">
-              Best quality and speed. Uses your API key; typically a few cents
-              per day.
+              Best quality and speed. Uses your OpenRouter key; typically a few
+              cents per day.
             </div>
           </button>
           <button type="button"
@@ -72,9 +75,13 @@ export default function Wizard({ onSaved }) {
 
         {form.default_tier === "api" ? (
           <div className="field">
-            <label>Cloud API key</label>
+            <label>OpenRouter API key</label>
             <input type="password" value={form.api_key} onChange={set("api_key")}
-                   placeholder={status.has_api_key ? "•••••• (saved)" : "paste your key"} />
+                   placeholder={status.has_api_key ? "•••••• (saved)" : "sk-or-v1-…"} />
+            <p className="hint">
+              Create one at openrouter.ai/keys — it works with every cloud model
+              below.
+            </p>
           </div>
         ) : (
           <div className="field">
@@ -97,9 +104,24 @@ export default function Wizard({ onSaved }) {
           stronger or cheaper model.
         </p>
         <div className="field">
-          <label>Cloud model (any OpenAI-compatible endpoint)</label>
+          <label>Cloud model (OpenRouter)</label>
           <input value={form.api_model} onChange={set("api_model")}
-                 placeholder="glm-4-flash" />
+                 placeholder="openrouter/auto" />
+          <p className="hint">
+            Any model from openrouter.ai/models, e.g.{" "}
+            <code>anthropic/claude-sonnet-4.5</code>,{" "}
+            <code>qwen/qwen3-235b-a22b</code>, or <code>openrouter/auto</code>{" "}
+            (lets OpenRouter pick). Free options exist, e.g.{" "}
+            <code>deepseek/deepseek-chat-v3-0324:free</code>.
+          </p>
+        </div>
+        <div className="field">
+          <label>Cloud endpoint (OpenAI-compatible)</label>
+          <input value={form.api_base_url} onChange={set("api_base_url")}
+                 placeholder="https://openrouter.ai/api/v1" />
+          <p className="hint">
+            Only change this to point at a different OpenAI-compatible provider.
+          </p>
         </div>
         <div className="field">
           <label>Ollama model (must be pulled locally)</label>

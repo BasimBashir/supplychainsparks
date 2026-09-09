@@ -20,7 +20,7 @@ def seeded(settings):
 def test_generation_roundtrip_and_flags(seeded):
     db, story_id = seeded
     gen_id = db.save_generation(
-        story_id=story_id, format="article", language="en", model="glm-4-flash",
+        story_id=story_id, format="article", language="en", model="qwen/qwen3-235b-a22b",
         prompt_version="article_en_v1",
         content="# Head\n\nBody", seo_slug="story", seo_description="d",
         seo_tags='["a","b"]')

@@ -1,7 +1,7 @@
 """Web-search sources: a user-chosen topic -> DuckDuckGo News via the ddgs
 library (github.com/deedy5/ddgs, MIT, no API key) — so search sources work in
-local-only mode too. Ollama's search runs through its cloud, GLM's needs a key;
-ddgs is the only keyless, account-free option."""
+local-only mode too. Ollama's search runs through its cloud and cloud LLM
+search needs a key; ddgs is the only keyless, account-free option."""
 from __future__ import annotations
 
 from datetime import datetime

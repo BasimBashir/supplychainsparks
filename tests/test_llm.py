@@ -23,7 +23,7 @@ def _chat(payload):
 def test_api_tier_posts_to_chat_completions(settings):
     settings.judge.default_tier = "api"
     settings.judge.api.base_url = "https://api.example/v4"
-    settings.judge.api.model = "glm-4-flash"
+    settings.judge.api.model = "qwen/qwen3-235b-a22b"
     settings.judge.api.api_key = "sk-test"
     with respx.mock:
         route = respx.post("https://api.example/v4/chat/completions").respond(
@@ -32,7 +32,7 @@ def test_api_tier_posts_to_chat_completions(settings):
             [{"role": "user", "content": "hi"}], Seo)
     assert out.slug == "jeddah-capacity"
     body = json.loads(route.calls.last.request.content.decode())
-    assert body["model"] == "glm-4-flash"
+    assert body["model"] == "qwen/qwen3-235b-a22b"
     assert route.calls.last.request.headers["authorization"] == "Bearer sk-test"
 
 

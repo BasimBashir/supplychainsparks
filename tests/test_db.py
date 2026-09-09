@@ -60,7 +60,7 @@ def test_story_lifecycle_and_pending(db):
                      novelty=7, rationale_supply_chain="r", rationale_saudi_gcc="r",
                      rationale_market_impact="r", rationale_novelty="r",
                      suggested_category="ports-shipping", gist="g")
-    db.save_judge_score(story_id, tier="api", model="glm-4-flash",
+    db.save_judge_score(story_id, tier="api", model="qwen/qwen3-235b-a22b",
                         prompt_version="judge_v1", output=jo)
     db.set_story_judge_status(story_id, "api")
     db.set_story_ranking(story_id, priority=88.0, band="high", category="ports-shipping")

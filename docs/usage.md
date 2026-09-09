@@ -15,16 +15,18 @@ window keeps it running in the background. **Quit** from the tray menu.
 ## First run — Setup
 
 Open the app and go to **Setup**. Everything below is also configurable there;
-the raw values live in `secrets.yaml` next to your settings file (never
-committed) and override `settings.yaml`.
+the raw values live in `secrets.yaml` inside the app's data folder
+(`%LOCALAPPDATA%\SupplyChainSparks` — never committed, survives app updates)
+and override `settings.yaml`.
 
 ### 1. Engine — Cloud API or Local only
 
 Two cards choose where **all** AI work happens (scoring, writing, fact-checking):
 
-- **☁️ Cloud API** — best quality and speed. Needs an API key; costs a few
-  cents/day. Default endpoint is GLM; any OpenAI-compatible provider works
-  (edit `judge.api.base_url` in `settings.yaml`).
+- **☁️ Cloud API · OpenRouter** — best quality and speed. Needs an OpenRouter
+  key (openrouter.ai/keys); costs a few cents/day. OpenRouter fronts hundreds
+  of models from every major vendor; any other OpenAI-compatible provider also
+  works (edit the **Cloud endpoint** field or `judge.api.base_url`).
 - **🖥️ Local only · Ollama** — the full bypass: **no API key, no cloud, no
   cost**. Everything runs on this PC through Ollama.
 
@@ -39,11 +41,16 @@ trade for a fully offline pipeline. Switch back to Cloud anytime.
 
 ### 2. Models
 
-- **Cloud model** — the model name sent with every cloud request
-  (default `glm-4-flash`). Change it to use a stronger/cheaper model from your
-  provider, e.g. `glm-4-plus`.
+- **Cloud model** — the OpenRouter model name sent with every cloud request
+  (default `openrouter/auto`, which lets OpenRouter pick). Change it to any
+  model from openrouter.ai/models, e.g. `anthropic/claude-sonnet-4.5`,
+  `qwen/qwen3-235b-a22b`, or a free one like
+  `deepseek/deepseek-chat-v3-0324:free`.
 - **Ollama model** — the model name your local Ollama must serve
   (default `qwen2.5:3b`). It must be pulled locally (`ollama pull <name>`).
+
+Saved values persist across restarts: blank fields in Setup never erase what
+was saved earlier.
 
 ### 3. Website publishing — what is the content repo?
 

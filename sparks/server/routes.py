@@ -256,7 +256,7 @@ def settings_status(request: Request):
     import httpx
     from sparks.config import read_secrets
     settings = _settings(request)
-    secrets = read_secrets(settings.settings_path)
+    secrets = read_secrets(settings.data_dir)
     ollama = False
     try:
         ollama = httpx.get(f"{settings.judge.local.ollama_url}/api/version",
@@ -269,6 +269,8 @@ def settings_status(request: Request):
             "schedule_hours": settings.fetch.schedule_hours,
             "default_tier": settings.judge.default_tier,
             "api_model": settings.judge.api.model,
+            "api_base_url": settings.judge.api.base_url,
+            "repo_url": settings.publish.repo_url,
             "local_model": settings.judge.local.model}
 
 
@@ -277,12 +279,15 @@ def post_settings(request: Request, body: dict):
     from sparks.config import write_secrets
     settings = _settings(request)
     allowed = ("api_key", "repo_url", "git_token", "default_tier", "api_model",
-               "local_model", "schedule_hours")
-    secrets = {k: body[k] for k in allowed if k in body and body[k] is not None}
+               "api_base_url", "local_model", "schedule_hours")
+    # empty strings never overwrite: the setup form posts the whole form, and a
+    # blank key/repo field must not wipe what was saved on an earlier visit
+    secrets = {k: body[k] for k in allowed
+               if k in body and body[k] is not None and body[k] != ""}
     if secrets.get("default_tier") not in (None, "api", "local"):
         raise HTTPException(400, "default_tier must be api|local")
     if secrets:
-        write_secrets(settings.settings_path, secrets)
+        write_secrets(settings.data_dir, secrets)
         # apply immediately to the running app's settings object
         _apply_settings(settings, secrets)
     return {"status": "saved"}
@@ -299,6 +304,8 @@ def _apply_settings(settings, values: dict) -> None:
         settings.judge.default_tier = values["default_tier"]
     if values.get("api_model"):
         settings.judge.api.model = values["api_model"]
+    if values.get("api_base_url"):
+        settings.judge.api.base_url = values["api_base_url"]
     if values.get("local_model"):
         settings.judge.local.model = values["local_model"]
     if values.get("schedule_hours") is not None:
