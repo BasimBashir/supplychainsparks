@@ -5,7 +5,8 @@ data/
 secrets.yaml
 dist/
 build/
-*.spec
+!sparks_exe.spec
 .pytest_cache/
 node_modules/
 dashboard/dist/
+*.egg-info/

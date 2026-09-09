@@ -9,9 +9,43 @@ from logging.handlers import RotatingFileHandler
 from sparks.config import load_settings
 
 
+def _pid_alive(pid: int) -> bool:
+    """True if a process with this pid is running (Windows + POSIX)."""
+    try:
+        if os.name == "nt":
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            STILL_ACTIVE = 259
+            handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+            if not handle:
+                return False
+            try:
+                code = ctypes.c_ulong()
+                if kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                    return code.value == STILL_ACTIVE
+                return False
+            finally:
+                kernel32.CloseHandle(handle)
+        else:
+            os.kill(pid, 0)
+            return True
+    except (OSError, ValueError):
+        return False
+
+
 def acquire_lock(data_dir) -> bool:
     data_dir.mkdir(parents=True, exist_ok=True)
     lock_path = data_dir / "app.lock"
+    if lock_path.exists():
+        # stale lock from a hard kill / crash: steal it if that pid is gone
+        try:
+            old_pid = int(lock_path.read_text().strip() or 0)
+        except (OSError, ValueError):
+            old_pid = 0
+        if old_pid and _pid_alive(old_pid):
+            return False  # genuinely another instance (or ourselves)
+        lock_path.unlink(missing_ok=True)
     try:
         fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         os.write(fd, str(os.getpid()).encode())
@@ -45,11 +79,10 @@ def _quit(server, tray, data_dir) -> None:
 
 
 def _open_window(url: str) -> None:
+    """Create a webview window. webview.start() must own the MAIN thread on
+    Windows (WebView2 message loop), so we never call it from a worker."""
     import webview
     webview.create_window("Supply Chain Sparks", url, width=1280, height=800)
-    if not getattr(webview, "_sparks_started", False):
-        webview._sparks_started = True
-        threading.Thread(target=webview.start, daemon=True).start()
 
 
 def run() -> int:
@@ -57,8 +90,18 @@ def run() -> int:
     if not acquire_lock(settings.data_dir):
         return 0  # already running
     _setup_logging(settings.data_dir)
-    logging.getLogger(__name__).info("starting SupplyChainSparks app")
+    log = logging.getLogger(__name__)
+    log.info("starting SupplyChainSparks app")
+    try:
+        _run_app(settings)
+    except Exception:
+        log.exception("fatal error in app main loop")
+        release_lock(settings.data_dir)
+        return 1
+    return 0
 
+
+def _run_app(settings) -> None:
     import uvicorn
     from sparks.pipeline import run_cycle
     from sparks.server.app import create_app
@@ -70,7 +113,8 @@ def run() -> int:
     config = uvicorn.Config(app, host=settings.server.host, port=settings.server.port,
                             log_level="warning")
     server = uvicorn.Server(config)
-    threading.Thread(target=server.run, daemon=True).start()
+    threading.Thread(target=server.run, daemon=True,
+                     name="uvicorn").start()
 
     FetchScheduler(settings, job_runner).start()
 
@@ -85,9 +129,12 @@ def run() -> int:
         on_quit=lambda: _quit(server, tray, settings.data_dir),
     )
 
+    # Tray runs in a background thread; webview owns the main thread (Windows
+    # requires the WebView2 message loop on the main thread).
+    threading.Thread(target=tray.run, daemon=True, name="tray").start()
     _open_window(dashboard_url)   # main window at startup
-    tray.run()                    # blocks until quit
-    return 0
+    import webview
+    webview.start()   # blocks until all windows close / process exits via tray Quit
 
 
 if __name__ == "__main__":
