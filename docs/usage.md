@@ -12,22 +12,75 @@
 The app lives in the **system tray** (⚡-ish teal diamond icon). Closing the
 window keeps it running in the background. **Quit** from the tray menu.
 
-## First run — Setup (Settings tab)
+## First run — Setup
 
-Open the app and go to **Settings**:
+Open the app and go to **Setup**. Everything below is also configurable there;
+the raw values live in `secrets.yaml` next to your settings file (never
+committed) and override `settings.yaml`.
 
-1. **API key** — the writer/judge model. Default endpoint is GLM (`glm-4-flash`,
-   any OpenAI-compatible provider works — edit `judge.api` in `settings.yaml`).
-   Cost is a few cents/day.
-2. **Content repo URL + Git token** — a GitHub repo the app will publish articles
-   into (e.g. `https://github.com/<org>/<content-repo>.git` + a fine-grained PAT
-   with Contents: Read and write). The public website (Plan 3) deploys from this
-   repo on every push.
-3. **Fetch interval** — hours between automatic fetches (default 6; `0` = manual only).
-4. **Ollama** (optional) — if `ollama serve` with `qwen2.5:3b` is running, it shows ✓
-   and becomes the fallback judge when offline. Everything works without it.
+### 1. Engine — Cloud API or Local only
 
-Secrets are stored in `secrets.yaml` next to your settings file — never committed.
+Two cards choose where **all** AI work happens (scoring, writing, fact-checking):
+
+- **☁️ Cloud API** — best quality and speed. Needs an API key; costs a few
+  cents/day. Default endpoint is GLM; any OpenAI-compatible provider works
+  (edit `judge.api.base_url` in `settings.yaml`).
+- **🖥️ Local only · Ollama** — the full bypass: **no API key, no cloud, no
+  cost**. Everything runs on this PC through Ollama.
+
+To use local mode:
+1. Install Ollama from ollama.com.
+2. Pull a model: `ollama pull qwen2.5:3b` (or any model you prefer).
+3. Have Ollama running (`ollama serve`, or the desktop app).
+4. In Setup, pick **Local only** and save.
+
+Expect noticeably slower generation and lower polish on CPU — that is the
+trade for a fully offline pipeline. Switch back to Cloud anytime.
+
+### 2. Models
+
+- **Cloud model** — the model name sent with every cloud request
+  (default `glm-4-flash`). Change it to use a stronger/cheaper model from your
+  provider, e.g. `glm-4-plus`.
+- **Ollama model** — the model name your local Ollama must serve
+  (default `qwen2.5:3b`). It must be pulled locally (`ollama pull <name>`).
+
+### 3. Website publishing — what is the content repo?
+
+The **content repo** is a plain GitHub repository that stores your published
+articles as files:
+
+```
+content/posts/saudi-port-expansion-2026/
+├── en.md       ← English article (markdown)
+├── ar.md       ← Arabic article (markdown)
+└── meta.json   ← title, description, category, tags, timestamps
+```
+
+It is the **bridge between the app and the website**:
+
+```
+desktop app ──commit──▶ GitHub content repo ──auto-build──▶ supplychainsparks.com
+```
+
+When you click **Publish to website**, the app commits the story's files into
+this repository and pushes. The website is built directly from the repo, so it
+rebuilds itself about a minute after every publish — and since the articles
+live in GitHub, **the site stays up even when your PC is off**.
+
+Setup:
+1. Create an empty GitHub repository (e.g. `sparks-content`).
+2. Create a fine-grained personal access token with **Contents: Read and
+   write** access to it.
+3. Paste the repo URL + token into Setup.
+
+The website itself (Plan 3) connects this repo to Cloudflare Pages — same
+repository, nothing extra to run.
+
+### 4. Schedule
+
+Hours between automatic fetches (default 6). `0` disables scheduling — you
+fetch manually with **Fetch now**.
 
 ## Daily workflow
 
@@ -78,5 +131,7 @@ sparks replay          # rebuild everything from raw files (keeps judge verdicts
   app publishes into is the input side of it.
 - LinkedIn auto-posting is deliberately not included (API restrictions);
   copy-paste with preview is the v1 flow.
-- If the API key is missing, scoring falls back to Ollama (if running) and
-  stories may be marked `unscored` — the queue still works.
+- In **Cloud** mode, if the API key is missing or a request fails, scoring and
+  generation fall back to Ollama when it is running; otherwise stories are
+  marked `unscored` — the queue still works.
+- In **Local only** mode nothing ever leaves this PC.
