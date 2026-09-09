@@ -106,6 +106,25 @@ fetch manually with **Fetch now**.
 5. **Published tab** — the archive: everything published, destination, live URL,
    timestamps.
 
+### Sources tab — manage what gets fetched
+
+The **Sources** tab lists every source the engine fetches: name, type
+(RSS/HTML), health, credibility, and whether it's enabled. Use it to:
+
+- **Add a source** — name, type, URL. Credibility (0–1) feeds the ranking;
+  a category hint (e.g. `ports-shipping`) helps the judge. For HTML pages,
+  a link pattern (regex, default `press|news|article`) decides which links
+  count as stories. Adding a URL that already exists updates it instead of
+  duplicating.
+- **Disable / enable** — a disabled source stays in the list but is skipped by
+  every fetch (useful when a feed goes bad). Re-enable the same way.
+
+The first app run seeds ten default sources (Google News queries for Saudi
+logistics/ports/GCC supply chain, Red Sea shipping, plus regional trade press).
+Closing the window with the **X button hides the app to the tray** — it keeps
+fetching on schedule. Tray → **Open Dashboard** (or launching the exe again)
+brings the window back; tray → **Quit** is the only way the app exits.
+
 ## Power-user CLI
 
 With the repo venv active (`.venv\Scripts\activate`):

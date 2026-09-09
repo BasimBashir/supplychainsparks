@@ -167,13 +167,18 @@ class Database:
                       link_pattern=r["link_pattern"], enabled=bool(r["enabled"]),
                       healthy=bool(r["healthy"]), last_fetch_at=_parse_dt(r["last_fetch_at"]))
 
-    def get_source(self, source_id: int) -> Source:
+    def get_source(self, source_id: int) -> Source | None:
         r = self.conn.execute("SELECT * FROM sources WHERE id=?", (source_id,)).fetchone()
-        return self._row_to_source(r)
+        return self._row_to_source(r) if r is not None else None
 
     def all_sources(self, enabled_only: bool = True) -> list[Source]:
         q = "SELECT * FROM sources" + (" WHERE enabled=1" if enabled_only else "") + " ORDER BY id"
         return [self._row_to_source(r) for r in self.conn.execute(q).fetchall()]
+
+    def set_source_enabled(self, source_id: int, enabled: bool) -> None:
+        self.conn.execute("UPDATE sources SET enabled=? WHERE id=?",
+                          (int(enabled), source_id))
+        self.conn.commit()
 
     def mark_source_health(self, source_id: int, healthy: bool) -> None:
         self.conn.execute("UPDATE sources SET healthy=? WHERE id=?", (int(healthy), source_id))

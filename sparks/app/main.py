@@ -9,6 +9,9 @@ from logging.handlers import RotatingFileHandler
 from sparks.config import load_settings
 
 
+_WINDOW = None
+
+
 def _pid_alive(pid: int) -> bool:
     """True if a process with this pid is running (Windows + POSIX)."""
     try:
@@ -90,16 +93,46 @@ def _ensure_sources(settings, log) -> None:
         log.info("seeded %d default sources (first run)", seeded)
 
 
-def _open_window(url: str) -> None:
-    """Create a webview window. webview.start() must own the MAIN thread on
-    Windows (WebView2 message loop), so we never call it from a worker."""
+def _open_window(url: str):
+    """Create the main webview window once; later calls just re-show it.
+
+    The X button hides the window to the tray instead of quitting (standard
+    Windows tray-app behavior) — webview.start() therefore never unblocks and
+    the app lives until Quit in the tray. webview.start() must own the MAIN
+    thread on Windows (WebView2 message loop)."""
     import webview
-    webview.create_window("Supply Chain Sparks", url, width=1280, height=800)
+    global _WINDOW
+    if _WINDOW is None:
+        _WINDOW = webview.create_window("Supply Chain Sparks", url,
+                                        width=1280, height=800)
+
+        def hide_to_tray():
+            _WINDOW.hide()
+            return True  # cancel the close; keep running in the tray
+        _WINDOW.events.closing += hide_to_tray
+    else:
+        _WINDOW.show()
+    return _WINDOW
+
+
+def _show_running_instance(settings) -> None:
+    """Relaunch while another instance runs: ask it to show its window."""
+    import httpx
+    from sparks.db import Database
+    try:
+        token = Database(settings.db_path).get_setting("server_token")
+        if token:
+            httpx.post(
+                f"http://{settings.server.host}:{settings.server.port}/api/show",
+                headers={"X-Sparks-Token": token}, timeout=2.0)
+    except Exception:
+        pass  # unreachable instance — nothing more we can do here
 
 
 def run() -> int:
     settings = load_settings()
     if not acquire_lock(settings.data_dir):
+        _show_running_instance(settings)
         return 0  # already running
     _setup_logging(settings.data_dir)
     log = logging.getLogger(__name__)
@@ -135,6 +168,8 @@ def _run_app(settings) -> None:
     token = app.state.db.get_setting("server_token")
     dashboard_url = (f"http://{settings.server.host}:{settings.server.port}"
                      f"/?token={token}")
+    # second-instance /api/show reveals the already-created window
+    app.state.show_window = lambda: _open_window(dashboard_url)
 
     tray = build_tray(
         on_open=lambda: _open_window(dashboard_url),
@@ -147,7 +182,8 @@ def _run_app(settings) -> None:
     threading.Thread(target=tray.run, daemon=True, name="tray").start()
     _open_window(dashboard_url)   # main window at startup
     import webview
-    webview.start()   # blocks until all windows close / process exits via tray Quit
+    webview.start()   # blocks for the app's lifetime: the X button only hides
+                       # the window; the process exits via tray Quit (os._exit)
 
 
 if __name__ == "__main__":

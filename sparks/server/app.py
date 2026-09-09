@@ -20,10 +20,11 @@ def _server_token(db: Database) -> str:
 
 
 def create_app(settings: Settings, db: Database | None = None,
-               job_runner=None) -> FastAPI:
+               job_runner=None, show_window=None) -> FastAPI:
     db = db or Database(settings.db_path)
     token = _server_token(db)
     app = FastAPI(title="Supply Chain Sparks", docs_url=None, redoc_url=None)
+    app.state.show_window = show_window  # desktop app sets this (may be None)
 
     @app.middleware("http")
     async def check_token(request: Request, call_next):

@@ -70,10 +70,45 @@ def select_story(request: Request, story_id: int):
 
 @router.get("/sources")
 def sources(request: Request):
-    return {"sources": [{"name": s.name, "kind": s.kind, "url": s.url,
+    return {"sources": [{"id": s.id, "name": s.name, "kind": s.kind, "url": s.url,
                          "healthy": s.healthy, "enabled": s.enabled,
-                         "credibility": s.credibility}
+                         "credibility": s.credibility,
+                         "category_hint": s.category_hint}
                         for s in _db(request).all_sources(enabled_only=False)]}
+
+
+@router.post("/sources")
+def add_source(request: Request, body: dict):
+    """Add a source (or update it when the same URL already exists)."""
+    from sparks.models import Source
+    name, kind, url = body.get("name"), body.get("kind"), body.get("url")
+    if not name or not url:
+        raise HTTPException(400, "name and url required")
+    if kind not in ("rss", "html"):
+        raise HTTPException(400, "kind must be rss|html")
+    if not url.startswith(("http://", "https://")):
+        raise HTTPException(400, "url must start with http:// or https://")
+    db = _db(request)
+    existing = db.all_sources(enabled_only=False)
+    db.upsert_source(Source(
+        name=name.strip(), kind=kind, url=url.strip(),
+        credibility=float(body.get("credibility", 0.5) or 0.5),
+        category_hint=body.get("category_hint") or None,
+        link_pattern=body.get("link_pattern") or None))
+    verb = "updated" if any(s.url == url.strip() for s in existing) else "added"
+    return {"status": verb}
+
+
+@router.post("/sources/{source_id}/toggle")
+def toggle_source(request: Request, source_id: int, body: dict):
+    enabled = body.get("enabled")
+    if enabled is None:
+        raise HTTPException(400, "enabled (bool) required")
+    db = _db(request)
+    if not db.get_source(source_id):
+        raise HTTPException(404, "source not found")
+    db.set_source_enabled(source_id, bool(enabled))
+    return {"status": "enabled" if enabled else "disabled"}
 
 
 @router.post("/fetch-now")
@@ -87,6 +122,16 @@ def fetch_now(request: Request):
 @router.get("/jobs/{job_id}")
 def job_status(request: Request, job_id: str):
     return request.app.state.job_runner.status(job_id)
+
+
+@router.post("/show")
+def show_window(request: Request):
+    """Second app launch asks the running instance to reveal its window."""
+    fn = getattr(request.app.state, "show_window", None)
+    if fn is None:
+        raise HTTPException(503, "no window (running outside the desktop app)")
+    fn()
+    return {"status": "shown"}
 
 
 @router.post("/stories/{story_id}/generate")

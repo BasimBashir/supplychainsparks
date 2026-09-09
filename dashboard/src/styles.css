@@ -497,3 +497,57 @@ tr:hover td { background: rgba(255, 255, 255, 0.015); }
 @media (prefers-reduced-motion: reduce) {
   .flash { animation: none; }
 }
+
+/* sources management */
+.sources { display: flex; flex-direction: column; gap: 12px; }
+.source-form { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.source-form .form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 14px;
+}
+.source-form .span-2 { grid-column: span 2; }
+.source-form label { display: flex; flex-direction: column; gap: 5px; }
+.source-form label span {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-low);
+}
+.source-form label span i { text-transform: none; font-weight: 400; }
+.source-form input, .source-form select {
+  background: var(--bg-base);
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  color: var(--text-hi);
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+  outline: none;
+}
+.source-form input:focus, .source-form select:focus {
+  border-color: var(--accent-dim);
+  box-shadow: 0 0 0 1px var(--accent-dim);
+}
+.source-form .form-actions { display: flex; justify-content: flex-end; }
+.source-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+}
+.source-row.off .story-title { color: var(--text-mid); }
+.source-url {
+  font-family: var(--font-data);
+  font-size: 11.5px;
+  color: var(--text-low);
+  word-break: break-all;
+  margin: 3px 0 5px;
+}
+.source-row .cred {
+  font-size: 11px;
+  color: var(--text-low);
+  font-family: var(--font-data);
+}

@@ -3,6 +3,7 @@ import QueueView from "./views/QueueView.jsx";
 import StoryDetail from "./views/StoryDetail.jsx";
 import ReviewView from "./views/ReviewView.jsx";
 import PublishedView from "./views/PublishedView.jsx";
+import SourcesView from "./views/SourcesView.jsx";
 import Wizard from "./views/Wizard.jsx";
 import { apiGet, apiPost } from "./api.js";
 
@@ -41,9 +42,17 @@ const ICONS = {
                M12.4 3.6L11 5M5 11l-1.4 1.4" strokeLinecap="round" />
     </svg>
   ),
+  sources: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+         strokeWidth="1.4" aria-hidden>
+      <ellipse cx="8" cy="4" rx="5.5" ry="2.2" />
+      <path d="M2.5 4v8c0 1.2 2.5 2.2 5.5 2.2s5.5-1 5.5-2.2V4" strokeLinecap="round" />
+      <path d="M2.5 8c0 1.2 2.5 2.2 5.5 2.2s5.5-1 5.5-2.2" strokeLinecap="round" />
+    </svg>
+  ),
 };
 
-const TABS = ["queue", "review", "published", "settings"];
+const TABS = ["queue", "review", "published", "sources", "settings"];
 
 export default function App() {
   const [tab, setTab] = useState("queue");
@@ -140,12 +149,14 @@ export default function App() {
           <div>
             <h1 className="page-title">
               {tab === "queue" ? "Story queue" : tab === "review" ? "Review"
-                : tab === "published" ? "Published" : "Setup"}
+                : tab === "published" ? "Published"
+                : tab === "sources" ? "Sources" : "Setup"}
             </h1>
             <p className="page-sub">
               {tab === "queue" ? "Ranked by editorial priority — select stories to publish"
                 : tab === "review" ? "Edit, fact-check, approve"
                 : tab === "published" ? "Publication archive with timestamps"
+                : tab === "sources" ? "Where stories are fetched from"
                 : "Engine, models and publishing"}
             </p>
           </div>
@@ -166,6 +177,7 @@ export default function App() {
             : <QueueView onSelect={setOpenStory} refreshKey={queueKey} />)}
           {tab === "review" && <ReviewView />}
           {tab === "published" && <PublishedView />}
+          {tab === "sources" && <SourcesView />}
           {tab === "settings" && <Wizard onSaved={refreshStatus} />}
         </div>
       </div>
