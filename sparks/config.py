@@ -18,7 +18,7 @@ class FetchConfig:
     per_domain_delay_seconds: float = 3.0
     timeout_seconds: int = 20
     max_items_per_source: int = 50
-    schedule_hours: float = 6.0
+    schedule_hours: float = 0.0
 
 
 @dataclass

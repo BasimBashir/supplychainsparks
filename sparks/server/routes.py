@@ -40,6 +40,29 @@ def queue(request: Request, band: str | None = None, n: int = 50):
     return {"stories": out, "unscored_count": db.count_unscored()}
 
 
+@router.get("/review")
+def review(request: Request):
+    """Stories in the review pipeline (selected, generating, review, approved)."""
+    db = _db(request)
+    stories = db.review_stories()
+    out = []
+    for s in stories:
+        judge = db.latest_judge(s.id)
+        gens = db.generations_for(s.id)
+        out.append({
+            "id": s.id, "title": s.title, "priority": s.priority,
+            "band": s.band, "category": s.category, "status": s.status,
+            "n_sources": s.n_sources, "generation_count": len(gens),
+            "judge": {"gist": judge.gist, "category": judge.suggested_category,
+                      "rationale": judge.rationale_market_impact,
+                      "scores": {"sc": judge.supply_chain_relevance,
+                                 "saudi": judge.saudi_gcc_relevance,
+                                 "impact": judge.market_impact,
+                                 "novelty": judge.novelty}} if judge else None,
+        })
+    return {"stories": out}
+
+
 @router.get("/stories/{story_id}")
 def story_detail(request: Request, story_id: int):
     db = _db(request)
@@ -80,6 +103,27 @@ def delete_story(request: Request, story_id: int):
                                   "the article is live on the website")
     db.delete_story(story_id)
     return {"status": "deleted"}
+
+
+@router.post("/stories/bulk-delete")
+def bulk_delete_stories(request: Request, body: dict):
+    """Delete multiple stories by IDs. Published stories are skipped."""
+    db = _db(request)
+    ids = body.get("ids", [])
+    if not isinstance(ids, list) or not ids:
+        raise HTTPException(400, "ids (list) required")
+    deleted = 0
+    skipped_published = 0
+    for story_id in ids:
+        story = db.get_story(story_id)
+        if not story:
+            continue
+        if story.status == "published":
+            skipped_published += 1
+            continue
+        db.delete_story(story_id)
+        deleted += 1
+    return {"status": "deleted", "count": deleted, "skipped_published": skipped_published}
 
 
 @router.get("/sources")
@@ -142,6 +186,22 @@ def delete_source(request: Request, source_id: int):
     db.delete_source(source_id)
     purged = db.purge_orphan_stories()
     return {"status": "deleted", "stories_purged": purged}
+
+
+@router.post("/sources/bulk-delete")
+def bulk_delete_sources(request: Request, body: dict):
+    """Delete multiple sources by IDs. Stories left empty are purged."""
+    db = _db(request)
+    ids = body.get("ids", [])
+    if not isinstance(ids, list) or not ids:
+        raise HTTPException(400, "ids (list) required")
+    deleted = 0
+    for source_id in ids:
+        if db.get_source(source_id):
+            db.delete_source(source_id)
+            deleted += 1
+    purged = db.purge_orphan_stories()
+    return {"status": "deleted", "count": deleted, "stories_purged": purged}
 
 
 @router.post("/fetch-now")

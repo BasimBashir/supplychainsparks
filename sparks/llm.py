@@ -36,7 +36,9 @@ class LlmClient:
     @property
     def client(self) -> httpx.Client:
         if self._client is None:
-            timeout = 300 if self.tier == "local" else 120  # CPU inference is slow
+            # Generation: 4 sequential calls (article EN/AR, linkedin EN/AR) can take
+            # 6-8 min total for 27B model on GPU. Give each call 10 min headroom.
+            timeout = 600 if self.tier == "local" else 120
             self._client = httpx.Client(timeout=timeout)
         return self._client
 

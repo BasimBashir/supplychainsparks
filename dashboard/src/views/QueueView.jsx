@@ -6,6 +6,7 @@ export default function QueueView({ onSelect, refreshKey = 0 }) {
   const [band, setBand] = useState("");
   const [unscoredCount, setUnscoredCount] = useState(0);
   const [error, setError] = useState("");
+  const [selectedIds, setSelectedIds] = useState(new Set());
 
   async function refresh() {
     try {
@@ -15,6 +16,24 @@ export default function QueueView({ onSelect, refreshKey = 0 }) {
     } catch (e) { setError(String(e)); }
   }
   useEffect(() => { refresh(); }, [band, refreshKey]);
+  useEffect(() => { setSelectedIds(new Set()); }, [band]);
+
+  function toggleSelect(id) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function selectAll(checked) {
+    if (checked && stories) {
+      setSelectedIds(new Set(stories.map(s => s.id)));
+    } else {
+      setSelectedIds(new Set());
+    }
+  }
 
   async function select(id) {
     await apiPost(`/api/stories/${id}/select`);
@@ -32,6 +51,25 @@ export default function QueueView({ onSelect, refreshKey = 0 }) {
     } catch (e) { setError(String(e)); }
   }
 
+  async function bulkRemove() {
+    if (!selectedIds.size) return;
+    const titles = stories?.filter(s => selectedIds.has(s.id)).map(s => s.title).join("; ") || "";
+    if (!window.confirm(`Delete ${selectedIds.size} story(s)?\n\n${titles}\n\n` +
+                        `This cannot be undone.`))
+      return;
+    try {
+      const r = await apiPost("/api/stories/bulk-delete", { ids: Array.from(selectedIds) });
+      setError(r.skipped_published
+        ? `Deleted ${r.count} story(s), skipped ${r.skipped_published} published`
+        : `Deleted ${r.count} story(s)`);
+      setSelectedIds(new Set());
+      refresh();
+    } catch (e) { setError(String(e)); }
+  }
+
+  const allSelected = stories && stories.length > 0 && selectedIds.size === stories.length;
+  const hasDeletable = stories?.some(s => selectedIds.has(s.id) && s.status !== "published") ?? false;
+
   return (
     <div className="queue">
       <div className="queue-toolbar">
@@ -41,6 +79,19 @@ export default function QueueView({ onSelect, refreshKey = 0 }) {
             {b === "" ? "all priorities" : b}
           </button>
         ))}
+        {selectedIds.size > 0 && (
+          <div className="bulk-actions-inline">
+            <span className="bulk-count">{selectedIds.size} selected</span>
+            {hasDeletable && (
+              <button className="btn danger small" onClick={bulkRemove}>
+                Delete selected
+              </button>
+            )}
+            <button className="btn subtle small" onClick={() => setSelectedIds(new Set())}>
+              Clear selection
+            </button>
+          </div>
+        )}
       </div>
 
       {error && <p className="empty">{error}</p>}
@@ -64,35 +115,48 @@ export default function QueueView({ onSelect, refreshKey = 0 }) {
         </div>
       )}
 
-      {stories?.map((s) => (
-        <div key={s.id} className={`story-card band-${s.band}`}>
-          <div className="score-block">
-            <div className="score-num">{s.priority?.toFixed(1) ?? "—"}</div>
-            <div className="score-label">priority</div>
+      {stories && stories.length > 0 && (
+        <>
+          <div className="bulk-select-header">
+            <label>
+              <input type="checkbox" checked={allSelected} onChange={e => selectAll(e.target.checked)} />
+              <span>Select all ({stories.length})</span>
+            </label>
           </div>
-          <div>
-            <div className="story-head">
-              <span className={`badge ${s.band}`}>{s.band}</span>
-              <span className="badge ghost">{s.category || "uncategorized"}</span>
-              <span className="badge ghost">{s.n_sources} source{s.n_sources === 1 ? "" : "s"}</span>
+          {stories.map((s) => (
+            <div key={s.id} className={`story-card band-${s.band} ${selectedIds.has(s.id) ? "selected" : ""}`}>
+              <input type="checkbox" className="row-select"
+                     checked={selectedIds.has(s.id)}
+                     onChange={() => toggleSelect(s.id)} />
+              <div className="score-block">
+                <div className="score-num">{s.priority?.toFixed(1) ?? "—"}</div>
+                <div className="score-label">priority</div>
+              </div>
+              <div>
+                <div className="story-head">
+                  <span className={`badge ${s.band}`}>{s.band}</span>
+                  <span className="badge ghost">{s.category || "uncategorized"}</span>
+                  <span className="badge ghost">{s.n_sources} source{s.n_sources === 1 ? "" : "s"}</span>
+                </div>
+                <h3 className="story-title">{s.title}</h3>
+                {s.judge && (
+                  <p className="rationale">
+                    💡 <b>Impact {s.judge.scores.impact}/10</b> — {s.judge.rationale}
+                  </p>
+                )}
+                {s.judge && <p className="gist">{s.judge.gist}</p>}
+                <div className="card-actions">
+                  <button className="btn accent small" onClick={() => select(s.id)}>Select</button>
+                  <button className="btn subtle small" onClick={() => onSelect?.(s.id)}>Open</button>
+                  {s.status !== "published" && (
+                    <button className="btn danger small" onClick={() => remove(s)}>Delete</button>
+                  )}
+                </div>
+              </div>
             </div>
-            <h3 className="story-title">{s.title}</h3>
-            {s.judge && (
-              <p className="rationale">
-                💡 <b>Impact {s.judge.scores.impact}/10</b> — {s.judge.rationale}
-              </p>
-            )}
-            {s.judge && <p className="gist">{s.judge.gist}</p>}
-            <div className="card-actions">
-              <button className="btn accent small" onClick={() => select(s.id)}>Select</button>
-              <button className="btn subtle small" onClick={() => onSelect?.(s.id)}>Open</button>
-              {s.status !== "published" && (
-                <button className="btn danger small" onClick={() => remove(s)}>Delete</button>
-              )}
-            </div>
-          </div>
-        </div>
-      ))}
+          ))}
+        </>
+      )}
     </div>
   );
 }

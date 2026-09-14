@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import QueueView from "./views/QueueView.jsx";
 import StoryDetail from "./views/StoryDetail.jsx";
 import ReviewView from "./views/ReviewView.jsx";
+import ReviewDetail from "./views/ReviewDetail.jsx";
 import PublishedView from "./views/PublishedView.jsx";
 import SourcesView from "./views/SourcesView.jsx";
 import Wizard from "./views/Wizard.jsx";
@@ -57,6 +58,7 @@ const TABS = ["queue", "review", "published", "sources", "settings"];
 export default function App() {
   const [tab, setTab] = useState("queue");
   const [openStory, setOpenStory] = useState(null);
+  const [openReviewStory, setOpenReviewStory] = useState(null);
   const [status, setStatus] = useState(null);
   const [fetching, setFetching] = useState(false);
   const [flash, setFlash] = useState(null);       // {kind: "ok"|"error", text}
@@ -175,7 +177,9 @@ export default function App() {
           {tab === "queue" && (openStory
             ? <StoryDetail storyId={openStory} onBack={() => setOpenStory(null)} />
             : <QueueView onSelect={setOpenStory} refreshKey={queueKey} />)}
-          {tab === "review" && <ReviewView />}
+          {tab === "review" && (openReviewStory
+            ? <ReviewDetail storyId={openReviewStory} onBack={() => setOpenReviewStory(null)} />
+            : <ReviewView onSelect={setOpenReviewStory} />)}
           {tab === "published" && <PublishedView />}
           {tab === "sources" && <SourcesView />}
           {tab === "settings" && <Wizard onSaved={refreshStatus} />}

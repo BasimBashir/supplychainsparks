@@ -9,7 +9,7 @@ fetch:
   per_domain_delay_seconds: 3
   timeout_seconds: 20
   max_items_per_source: 50
-  schedule_hours: 6        # automated fetch interval; 0 disables scheduling
+  schedule_hours: 0        # automated fetch interval; 0 disables scheduling
 
 publish:
   repo_url: ""             # https://github.com/<org>/<content-repo>.git

@@ -114,3 +114,35 @@ def test_delete_story_refuses_published(env):
     r = tc.post(f"/api/stories/{story_id}/delete", headers=h)
     assert r.status_code == 409
     assert db.get_story(story_id) is not None        # still there
+
+
+def test_review_endpoint_includes_selected_generating_review_approved(env):
+    """Review endpoint returns stories in review pipeline, queue does not."""
+    tc, h, db, story_id = env
+
+    # Select the story — it leaves queue, enters review
+    tc.post(f"/api/stories/{story_id}/select", headers=h)
+    assert db.get_story(story_id).status == "selected"
+
+    # Queue no longer shows it
+    q = tc.get("/api/queue", headers=h).json()["stories"]
+    assert all(s["id"] != story_id for s in q)
+
+    # Review endpoint shows it
+    r = tc.get("/api/review", headers=h).json()
+    assert any(s["id"] == story_id for s in r["stories"])
+    found = next(s for s in r["stories"] if s["id"] == story_id)
+    assert found["status"] == "selected"
+    assert found["generation_count"] == 0
+
+    # Move to generating → review → approved; all stay in review
+    for st in ("generating", "review", "approved"):
+        db.set_story_status(story_id, st)
+        r = tc.get("/api/review", headers=h).json()
+        found = next(s for s in r["stories"] if s["id"] == story_id)
+        assert found["status"] == st
+
+    # Published drops out of review
+    db.set_story_status(story_id, "published")
+    r = tc.get("/api/review", headers=h).json()
+    assert all(s["id"] != story_id for s in r["stories"])

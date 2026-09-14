@@ -19,7 +19,7 @@ def test_settings_status_defaults(env):
     assert r.status_code == 200
     data = r.json()
     assert data["has_api_key"] is False and data["has_repo"] is False
-    assert data["schedule_hours"] == 6
+    assert data["schedule_hours"] == 0
 
 
 def test_settings_status_ollama_detected(env, monkeypatch):

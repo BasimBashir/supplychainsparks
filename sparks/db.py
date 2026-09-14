@@ -402,6 +402,12 @@ class Database:
             " AND judge_status IN ('none', 'unscored')").fetchone()
         return row["c"]
 
+    def review_stories(self, limit: int = 100) -> list[StoryRecord]:
+        """Stories currently in the review pipeline (selected → generating → review → approved)."""
+        q = ("SELECT * FROM stories WHERE status IN ('selected', 'generating', 'review', 'approved')"
+             " ORDER BY updated_at DESC" + f" LIMIT {int(limit)}")
+        return [self._row_to_story(r) for r in self.conn.execute(q).fetchall()]
+
     def set_story_judge_status(self, story_id: int, judge_status: str) -> None:
         self.conn.execute("UPDATE stories SET judge_status=?, updated_at=? WHERE id=?",
                           (judge_status, datetime.now(timezone.utc).isoformat(), story_id))

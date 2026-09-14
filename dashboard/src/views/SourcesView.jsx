@@ -7,7 +7,8 @@ const EMPTY_FORM = { name: "", kind: "rss", url: "", credibility: "0.5",
 export default function SourcesView() {
   const [sources, setSources] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [note, setNote] = useState(null);   // {kind: "ok"|"error", text}
+  const [note, setNote] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
 
   async function refresh() {
     try { setSources((await apiGet("/api/sources")).sources); }
@@ -17,6 +18,23 @@ export default function SourcesView() {
 
   function set(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
+  }
+
+  function toggleSelect(id) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function selectAll(checked) {
+    if (checked && sources) {
+      setSelectedIds(new Set(sources.map(s => s.id)));
+    } else {
+      setSelectedIds(new Set());
+    }
   }
 
   async function addSource(e) {
@@ -60,6 +78,23 @@ export default function SourcesView() {
       refresh();
     } catch (e) { setNote({ kind: "error", text: String(e) }); }
   }
+
+  async function bulkRemove() {
+    if (!selectedIds.size) return;
+    const names = sources?.filter(s => selectedIds.has(s.id)).map(s => s.name).join(", ") || "";
+    if (!window.confirm(`Delete ${selectedIds.size} source(s): ${names}?\n\n` +
+                        `Their articles and stories built only from them ` +
+                        `will also be removed. This cannot be undone.`))
+      return;
+    try {
+      const r = await apiPost("/api/sources/bulk-delete", { ids: Array.from(selectedIds) });
+      setNote({ kind: "ok", text: `Deleted ${r.count} source(s), purged ${r.stories_purged} empty story(s)` });
+      setSelectedIds(new Set());
+      refresh();
+    } catch (e) { setNote({ kind: "error", text: String(e) }); }
+  }
+
+  const allSelected = sources && sources.length > 0 && selectedIds.size === sources.length;
 
   return (
     <div className="sources">
@@ -122,31 +157,49 @@ export default function SourcesView() {
         <div className="empty">No sources yet — add one above.</div>
       )}
 
-      {sources?.map((s) => (
-        <div key={s.id} className={`source-row card ${s.enabled ? "" : "off"}`}>
-          <div className="source-main">
-            <div className="story-head">
-              <span className="badge ghost">{s.kind}</span>
-              <span className={`badge ${s.healthy ? "high" : "low"}`}>
-                {s.healthy ? "healthy" : "unhealthy"}
-              </span>
-              {!s.enabled && <span className="badge ghost">disabled</span>}
-              {s.category_hint && <span className="badge ghost">{s.category_hint}</span>}
+      {sources && sources.length > 0 && (
+        <>
+          <div className="bulk-actions">
+            <label className="bulk-select-all">
+              <input type="checkbox" checked={allSelected} onChange={e => selectAll(e.target.checked)} />
+              <span>Select all ({sources.length})</span>
+            </label>
+            {selectedIds.size > 0 && (
+              <button className="btn danger small" onClick={bulkRemove}>
+                Delete selected ({selectedIds.size})
+              </button>
+            )}
+          </div>
+          {sources.map((s) => (
+            <div key={s.id} className={`source-row card ${s.enabled ? "" : "off"}`}>
+              <div className="source-main">
+                <input type="checkbox" className="row-select"
+                       checked={selectedIds.has(s.id)}
+                       onChange={() => toggleSelect(s.id)} />
+                <div className="story-head">
+                  <span className="badge ghost">{s.kind}</span>
+                  <span className={`badge ${s.healthy ? "high" : "low"}`}>
+                    {s.healthy ? "healthy" : "unhealthy"}
+                  </span>
+                  {!s.enabled && <span className="badge ghost">disabled</span>}
+                  {s.category_hint && <span className="badge ghost">{s.category_hint}</span>}
+                </div>
+                <h3 className="story-title">{s.name}</h3>
+                <p className="source-url">{s.kind === "search"
+                  ? `🔍 topic — ${s.url}` : s.url}</p>
+                <span className="cred">credibility {Number(s.credibility).toFixed(1)}</span>
+              </div>
+              <div className="source-actions">
+                <button className={`btn subtle small ${s.enabled ? "" : "accent"}`}
+                        onClick={() => toggle(s)}>
+                  {s.enabled ? "Disable" : "Enable"}
+                </button>
+                <button className="btn danger small" onClick={() => remove(s)}>Delete</button>
+              </div>
             </div>
-            <h3 className="story-title">{s.name}</h3>
-            <p className="source-url">{s.kind === "search"
-              ? `🔍 topic — ${s.url}` : s.url}</p>
-            <span className="cred">credibility {Number(s.credibility).toFixed(1)}</span>
-          </div>
-          <div className="source-actions">
-            <button className={`btn subtle small ${s.enabled ? "" : "accent"}`}
-                    onClick={() => toggle(s)}>
-              {s.enabled ? "Disable" : "Enable"}
-            </button>
-            <button className="btn danger small" onClick={() => remove(s)}>Delete</button>
-          </div>
-        </div>
-      ))}
+          ))}
+        </>
+      )}
     </div>
   );
 }
