@@ -49,10 +49,12 @@ def review(request: Request):
     for s in stories:
         judge = db.latest_judge(s.id)
         gens = db.generations_for(s.id)
+        open_flags = db.open_flags(s.id)
         out.append({
             "id": s.id, "title": s.title, "priority": s.priority,
             "band": s.band, "category": s.category, "status": s.status,
             "n_sources": s.n_sources, "generation_count": len(gens),
+            "open_flag_count": len(open_flags),
             "judge": {"gist": judge.gist, "category": judge.suggested_category,
                       "rationale": judge.rationale_market_impact,
                       "scores": {"sc": judge.supply_chain_relevance,

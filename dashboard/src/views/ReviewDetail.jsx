@@ -51,8 +51,13 @@ export default function ReviewDetail({ storyId, onBack }) {
     }, 1500);
   }
   async function resolve(id) {
-    await apiPost(`/api/flags/${id}/resolve`, { resolution: "resolved_confirm" });
-    refresh();
+    try {
+      await apiPost(`/api/flags/${id}/resolve`, { resolution: "resolved_confirm" });
+      refresh();
+      setMsg("Flag resolved ✓");
+    } catch (e) {
+      setMsg(`Failed to resolve flag: ${String(e)}`);
+    }
   }
   async function approve() {
     await apiPost(`/api/stories/${storyId}/approve`);
